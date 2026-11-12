@@ -1,0 +1,25 @@
+{
+  "name": "nodedash",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:mock": "VITE_MOCK=1 npm run dev -w @nodedash/web",
+    "build": "npm run build -w @nodedash/web",
+    "preview": "npm run preview -w @nodedash/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "screenshots": "SCREENSHOTS=1 playwright test screenshots.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "vitest": "4.1.11"
+  }
+}
