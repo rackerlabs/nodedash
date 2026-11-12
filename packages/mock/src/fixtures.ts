@@ -451,6 +451,17 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
         local_gb: rng.pick([446, 893, 1788]),
         cpu_arch: 'x86_64',
       },
+      // Built from values already drawn, so adding it left every later fixture
+      // unchanged. Nodes still enrolling have none yet.
+      extra:
+        provisionState === 'enroll'
+          ? {}
+          : {
+              rack: `${site}-r${String(rack).padStart(2, '0')}`,
+              rack_unit: unit,
+              asset_tag: `AT-${uuid.slice(0, 8).toUpperCase()}`,
+              source_of_truth: { system: 'dcim', device_id: uuid },
+            },
       created_at: isoDaysAgo(rng, 720),
       updated_at: isoDaysAgo(rng, 14),
     });

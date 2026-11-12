@@ -26,6 +26,7 @@ import { useNodeContext } from './context';
 export function NodeOverviewPage() {
   const { node, row } = useNodeContext();
   const properties = (node.properties ?? {}) as Record<string, unknown>;
+  const extra = node.extra ?? {};
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -134,13 +135,24 @@ export function NodeOverviewPage() {
             {Object.keys(properties).length === 0 ? (
               <p className="text-sm text-muted-foreground">No properties recorded.</p>
             ) : (
-              Object.entries(properties).map(([key, value]) => (
-                <Field key={key} label={key} mono>
-                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                </Field>
-              ))
+              <RecordFields record={properties} />
             )}
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-3">
+        <CardHeader>
+          <CardTitle>Extra</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {Object.keys(extra).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing in this node&apos;s extra field.</p>
+          ) : (
+            <dl className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+              <RecordFields record={extra} />
+            </dl>
+          )}
         </CardContent>
       </Card>
 
@@ -158,6 +170,15 @@ export function NodeOverviewPage() {
       </Card>
     </div>
   );
+}
+
+/** One field per key, in the order Ironic returned them; nested values as JSON. */
+function RecordFields({ record }: { record: Record<string, unknown> }) {
+  return Object.entries(record).map(([key, value]) => (
+    <Field key={key} label={key} mono>
+      {value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value)}
+    </Field>
+  ));
 }
 
 /**

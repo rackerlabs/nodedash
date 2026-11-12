@@ -60,6 +60,8 @@ export const NodeSchema = z.looseObject({
   lessee: z.string().nullish(),
   description: z.string().nullish(),
   properties: jsonRecord.nullish(),
+  /** Free-form metadata operators and tooling attach to the node. */
+  extra: jsonRecord.nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
 });
