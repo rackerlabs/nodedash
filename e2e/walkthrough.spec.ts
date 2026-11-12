@@ -129,6 +129,9 @@ test.describe('node detail', () => {
     await chooseProject(page);
     await openFirstNode(page);
 
+    await expect(page.getByText('Extra', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^asset_tag$|^Nothing in this node/).first()).toBeVisible();
+
     const uuid = page.url().split('/nodes/')[1]!;
     for (const [tab, heading] of [
       ['inventory', /Network interfaces/],
