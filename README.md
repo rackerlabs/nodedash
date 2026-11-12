@@ -115,6 +115,20 @@ CI (`.github/workflows/ci.yml`) tests and builds it on every pull request, and p
 `ghcr.io/rackerlabs/nodedash` with build provenance from `main` (tagged `main` and the commit sha) and from `v*`
 tags. Deployments should pin the digest.
 
+### Helm chart
+
+`charts/nodedash` deploys the image: a hardened Deployment (non-root, read-only root filesystem, no service
+account token), Service, PodDisruptionBudget, and optional HTTPRoute, Ingress, NetworkPolicy and ExternalSecret.
+Settings go in `config` (the variables from `apps/bff/.env.example`). The chart never takes `SESSION_KEYS`
+itself: point `sessionKeys.secretName` at an existing Secret, or enable `sessionKeys.externalSecret`.
+
+Each `v*` tag releases the chart to `oci://ghcr.io/rackerlabs/charts/nodedash` at the same version as the image,
+pinned to that image's digest:
+
+```bash
+helm install nodedash oci://ghcr.io/rackerlabs/charts/nodedash --version 0.1.0 -f my-values.yaml
+```
+
 ### Branding
 
 The name, tagline and logo come from the BFF's environment and reach the SPA with the session, so one image

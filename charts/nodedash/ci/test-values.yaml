@@ -1,0 +1,35 @@
+# Copyright 2026 Rackspace Technology.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+# Every optional feature on, for CI's lint and render.
+---
+image: {digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+imagePullSecrets: [{name: registry-creds}]
+config:
+  PUBLIC_URL: https://nodedash.example.com
+  KEYSTONE_URL: https://keystone.example.com
+  IDENTITY_PROVIDERS: "sso:openid:Corp SSO"
+  BRAND_NAME: Fleet Console
+sessionKeys:
+  externalSecret:
+    enabled: true
+    secretStoreRef: {kind: ClusterSecretStore, name: vault}
+    dataFrom: [{extract: {key: "nodedash/dev"}}]
+    template: {engineVersion: v2, data: {SESSION_KEYS: "{{ .password }}"}}
+extraEnv: [{name: NODE_EXTRA_CA_CERTS, value: /etc/ssl/extra/ca.crt}]
+extraVolumes: [{name: ca, configMap: {name: corp-ca}}]
+extraVolumeMounts: [{name: ca, mountPath: /etc/ssl/extra, readOnly: true}]
+httpRoute: {enabled: true, hostnames: [nodedash.example.com], parentRefs: [{name: external-gateway, namespace: envoy-gateway}]}
+ingress: {enabled: true, className: nginx, host: nodedash.example.com, tls: [{hosts: [nodedash.example.com], secretName: nodedash-tls}]}
+networkPolicy: {enabled: true, ingressFrom: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: envoy-gateway}}}]}

@@ -1,0 +1,117 @@
+# Copyright 2026 Rackspace Technology.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+replicaCount: 2
+
+image:
+  # CI sets this to the repository it runs in when it releases the chart.
+  repository: ghcr.io/rackerlabs/nodedash
+  # Defaults to the chart's appVersion.
+  tag: ""
+  # Pin an exact image. Takes precedence over tag when set.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Non-secret settings, passed to the container as environment variables. See
+# apps/bff/.env.example for every option. PUBLIC_URL and KEYSTONE_URL are required.
+config:
+  PUBLIC_URL: ""
+  KEYSTONE_URL: ""
+  IDENTITY_PROVIDERS: ""
+  WEBSSO_PROTOCOL: openid
+  IRONIC_INTERFACE: public
+  LOG_LEVEL: info
+  # BRAND_NAME: nodedash
+  # BRAND_TAGLINE: ""
+  # BRAND_LOGO_URL: ""
+  # SUPPORT_ASSIST_STORAGE_HOSTS: ""
+
+# SESSION_KEYS encrypts the session cookie, which holds users' Keystone tokens.
+# The chart never takes the key itself: point it at an existing Secret, or let
+# it create an ExternalSecret.
+sessionKeys:
+  # Secret holding the keys. Defaults to "<release>-session-keys".
+  secretName: ""
+  secretKey: SESSION_KEYS
+  externalSecret:
+    enabled: false
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: ""
+    # Passed through to the ExternalSecret spec as written.
+    data: []
+    dataFrom: []
+    # target.template, for example to map a store field onto SESSION_KEYS.
+    template: {}
+
+# Extra environment, for example NODE_EXTRA_CA_CERTS with a CA bundle mounted
+# through extraVolumes and extraVolumeMounts.
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Gateway API route. The page and /api must stay on one host.
+httpRoute:
+  enabled: false
+  hostnames: []
+  parentRefs: []
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []
+
+networkPolicy:
+  enabled: false
+  # Who may reach the pods, as NetworkPolicy "from" entries, for example the
+  # gateway's namespace.
+  ingressFrom: []
+  # Where the pods may connect. Empty allows any destination on egressPorts.
+  egressTo: []
+  egressPorts:
+    - port: 443
+      protocol: TCP
+  allowDns: true
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+serviceAccount:
+  create: true
+  name: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
