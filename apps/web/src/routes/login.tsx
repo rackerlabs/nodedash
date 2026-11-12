@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { KeyRound, Server, ShieldCheck } from 'lucide-react';
+import { KeyRound, ShieldCheck } from 'lucide-react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/misc';
 import { useLogin, useSession } from '@/features/auth/session';
+import { BrandMark, useBranding } from '@/features/branding/branding';
 import { errorMessage } from '@/lib/api/client';
 import { IS_MOCK } from '@/lib/env';
 import { FullPageSpinner } from './status';
@@ -29,6 +30,7 @@ export function LoginPage() {
   const login = useLogin();
   const [params] = useSearchParams();
   const next = params.get('next') ?? '/nodes';
+  const branding = useBranding();
 
   if (session.isPending) return <FullPageSpinner label="Checking your session…" />;
   if (session.data?.authenticated) return <Navigate to={next} replace />;
@@ -39,11 +41,9 @@ export function LoginPage() {
     <div className="flex min-h-full items-center justify-center px-6 py-16">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-2 text-center">
-          <Server className="size-8 text-primary" />
-          <h1 className="text-xl font-semibold tracking-tight">nodedash</h1>
-          <p className="text-sm text-muted-foreground">
-            Hardware administration for OpenStack Ironic bare metal nodes.
-          </p>
+          <BrandMark className="size-8" />
+          <h1 className="text-xl font-semibold tracking-tight">{branding.name}</h1>
+          {branding.tagline ? <p className="text-sm text-muted-foreground">{branding.tagline}</p> : null}
         </div>
 
         <Card>

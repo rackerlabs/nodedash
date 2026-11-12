@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Building2, ChevronsUpDown, LogOut, Moon, Server, Sun, UserRound } from 'lucide-react';
+import { Building2, ChevronsUpDown, LogOut, Moon, Sun, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Hint } from '@/components/ui/tooltip';
 import { useCapabilities, useLogout, useSession } from '@/features/auth/session';
+import { BrandMark, useBranding } from '@/features/branding/branding';
 import { ScenarioSwitcher } from '@/features/mock/scenario-switcher';
 import { RegionMenu } from '@/features/region/region-picker';
 import { ScopePickerDialog } from '@/features/scope/scope-picker';
@@ -60,14 +61,15 @@ export function AppShell() {
 
   const scope = session.data?.scope ?? null;
   const user = session.data?.user ?? null;
+  const branding = useBranding();
 
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="flex h-14 items-center gap-3 px-4">
           <Link to="/nodes" className="flex items-center gap-2 font-semibold tracking-tight">
-            <Server className="size-5 text-primary" />
-            <span className="hidden sm:inline">nodedash</span>
+            <BrandMark className="size-5" />
+            <span className="hidden sm:inline">{branding.name}</span>
           </Link>
 
           <RegionMenu />

@@ -53,6 +53,24 @@ export const RegionListSchema = z.object({
 });
 export type RegionList = z.infer<typeof RegionListSchema>;
 
+/**
+ * What the deployment calls this app. Set on the BFF (BRAND_* variables) and
+ * sent with the session, so one image can carry any name.
+ */
+export const BrandingSchema = z.object({
+  name: z.string(),
+  tagline: z.string(),
+  /** Shown in place of the default icon; an http(s) URL or a same-origin path. */
+  logoUrl: z.string().nullish(),
+});
+export type Branding = z.infer<typeof BrandingSchema>;
+
+export const DEFAULT_BRANDING: Branding = {
+  name: 'nodedash',
+  tagline: 'Hardware administration for OpenStack Ironic bare metal nodes.',
+  logoUrl: null,
+};
+
 export const SessionSchema = z.object({
   authenticated: z.boolean(),
   user: SessionUserSchema.nullish(),
@@ -63,6 +81,7 @@ export const SessionSchema = z.object({
   lastScope: ScopeSchema.nullish(),
   expiresAt: z.string().nullish(),
   identityProviders: z.array(IdentityProviderSchema).default([]),
+  branding: BrandingSchema.default(DEFAULT_BRANDING),
 });
 export type Session = z.infer<typeof SessionSchema>;
 

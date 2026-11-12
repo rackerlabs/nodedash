@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { DEFAULT_BRANDING } from '@nodedash/shared';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../config.ts';
 import { buildWebssoUrl, sanitizeNext } from './auth.ts';
@@ -104,6 +105,23 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...baseEnv, IRONIC_INTERFACE: 'private' } as NodeJS.ProcessEnv)).toThrow(
       /IRONIC_INTERFACE/,
     );
+  });
+
+  it('takes branding from BRAND_* and falls back to the defaults', () => {
+    expect(loadConfig(baseEnv as NodeJS.ProcessEnv).branding).toEqual(DEFAULT_BRANDING);
+    const branded = loadConfig({
+      ...baseEnv,
+      BRAND_NAME: 'Fleet Console',
+      BRAND_TAGLINE: '',
+      BRAND_LOGO_URL: '/brand/logo.svg',
+    } as NodeJS.ProcessEnv);
+    expect(branded.branding).toEqual({ name: 'Fleet Console', tagline: '', logoUrl: '/brand/logo.svg' });
+  });
+
+  it('refuses a logo URL that is not http(s) or a same-origin path', () => {
+    for (const logo of ['javascript:alert(1)', '//evil.example/logo.svg', 'logo.svg']) {
+      expect(() => loadConfig({ ...baseEnv, BRAND_LOGO_URL: logo } as NodeJS.ProcessEnv)).toThrow(/BRAND_LOGO_URL/);
+    }
   });
 
   it('defaults an IdP protocol to WEBSSO_PROTOCOL when the entry omits one', () => {

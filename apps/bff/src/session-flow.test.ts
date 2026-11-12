@@ -224,7 +224,12 @@ describe('encrypted session cookie', () => {
     expect(sessionCookie).not.toContain(UNSCOPED.slice(0, 20));
 
     const session = await call(app, jar, 'GET', '/api/session');
-    expect(session.json()).toMatchObject({ authenticated: true, region: null, scope: null });
+    expect(session.json()).toMatchObject({
+      authenticated: true,
+      region: null,
+      scope: null,
+      branding: { name: 'nodedash' },
+    });
   });
 
   it('refuses a WebSSO callback that was not started from this browser', async () => {

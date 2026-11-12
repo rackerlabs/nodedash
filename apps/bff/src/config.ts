@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { isAbsolute, resolve } from 'node:path';
+import { DEFAULT_BRANDING } from '@nodedash/shared';
 import { z } from 'zod';
 
 /**
@@ -70,6 +71,15 @@ const EnvSchema = z.object({
    * where a node exposes both a serial and a graphical console.
    */
   GRAPHICAL_CONSOLE_TYPE: z.string().default(''),
+
+  /** Name shown in the page title, header and sign-in page. */
+  BRAND_NAME: z.string().min(1).default(DEFAULT_BRANDING.name),
+  BRAND_TAGLINE: z.string().default(DEFAULT_BRANDING.tagline),
+  /** Optional logo in place of the default icon: an http(s) URL or a path served alongside the SPA. */
+  BRAND_LOGO_URL: z
+    .string()
+    .regex(/^(https?:\/\/|\/(?!\/))/, 'must be an http(s) URL or start with a single /')
+    .optional(),
 
   /** Serve a built SPA from this directory when set. */
   STATIC_DIR: z.string().optional(),
@@ -152,6 +162,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       .filter(Boolean),
     maxNodePages: raw.MAX_NODE_PAGES,
     graphicalConsoleType: raw.GRAPHICAL_CONSOLE_TYPE || null,
+    branding: { name: raw.BRAND_NAME, tagline: raw.BRAND_TAGLINE, logoUrl: raw.BRAND_LOGO_URL ?? null },
     // Static file serving needs an absolute root, so resolve it against the cwd.
     staticDir: raw.STATIC_DIR
       ? isAbsolute(raw.STATIC_DIR)

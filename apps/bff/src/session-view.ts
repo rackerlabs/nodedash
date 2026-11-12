@@ -45,5 +45,6 @@ export function sessionView(request: FastifyRequest, config: Config): Session {
       protocol: provider.protocol,
       label: provider.label,
     })),
+    branding: config.branding,
   };
 }

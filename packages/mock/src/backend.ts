@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import {
+  DEFAULT_BRANDING,
   buildCapabilityReport,
   canRunServiceSteps,
   resolveInstanceName,
@@ -205,6 +206,7 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     lastScope: null,
     expiresAt: null,
     identityProviders,
+    branding: DEFAULT_BRANDING,
   };
 
   function scopeFor(project: Project): Scope {

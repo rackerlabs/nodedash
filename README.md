@@ -115,6 +115,17 @@ CI (`.github/workflows/ci.yml`) tests and builds it on every pull request, and p
 `ghcr.io/rackerlabs/nodedash` with build provenance from `main` (tagged `main` and the commit sha) and from `v*`
 tags. Deployments should pin the digest.
 
+### Branding
+
+The name, tagline and logo come from the BFF's environment and reach the SPA with the session, so one image
+serves any deployment:
+
+| Variable | Default | Used for |
+| --- | --- | --- |
+| `BRAND_NAME` | `nodedash` | Tab title, header and sign-in page |
+| `BRAND_TAGLINE` | Hardware administration for OpenStack Ironic bare metal nodes. | Sign-in page; empty hides it |
+| `BRAND_LOGO_URL` | unset (default icon) | An http(s) URL, or a same-origin path such as a file in `STATIC_DIR` |
+
 ### Regions and the service catalog
 
 After sign-in the user picks a region from `GET /v3/regions` (skipped when there is only one). When they
