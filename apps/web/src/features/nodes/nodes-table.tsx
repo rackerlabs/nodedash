@@ -25,7 +25,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { NodeRow } from '@nodedash/shared';
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { nodeColumns, type ColumnMeta } from './columns';
@@ -43,12 +43,15 @@ export function NodesTable({
   onSortingChange,
   columnVisibility,
   onColumnVisibilityChange,
+  sortedRowsRef,
 }: {
   rows: NodeRow[];
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: (visibility: VisibilityState) => void;
+  /** Lets the page read the rows in the order the table currently shows them, e.g. for export. */
+  sortedRowsRef?: Ref<() => NodeRow[]>;
 }) {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,6 +70,7 @@ export function NodesTable({
   });
 
   const tableRows = table.getRowModel().rows;
+  useImperativeHandle(sortedRowsRef, () => () => tableRows.map((row) => row.original), [tableRows]);
   const visibleColumns = table.getVisibleLeafColumns();
 
   const virtualizer = useVirtualizer({
