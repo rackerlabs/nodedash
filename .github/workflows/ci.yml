@@ -56,6 +56,8 @@ jobs:
   image:
     needs: [test, chart]
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     permissions:
       contents: read
       # Push to GHCR and attach build provenance, only off main or a release tag.
@@ -118,3 +120,34 @@ jobs:
           helm package charts/nodedash --version "$version" --app-version "$version" --destination chart-dist
           echo "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           helm push "chart-dist/nodedash-${version}.tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+
+  # Publish the GitHub Release only after the image and chart are pushed: with
+  # immutable releases a published tag can never be retried.
+  release:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          chart="oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts/nodedash"
+          cat > notes.md <<EOF
+          Image: \`${image}@${DIGEST}\`
+          Chart: \`${chart}\` version \`${GITHUB_REF_NAME#v}\`
+          EOF
+          args=()
+          # A hyphen in the tag marks a semver pre-release, such as v0.2.0-rc1.
+          case "$GITHUB_REF_NAME" in *-*) args+=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes-file notes.md \
+            "${args[@]}"
