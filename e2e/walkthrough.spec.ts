@@ -121,6 +121,54 @@ test.describe('fleet view', () => {
     await page.getByRole('button', { name: 'Reset filters' }).click();
     await expect(counter).toHaveText(total);
   });
+
+  test('exports the filtered, sorted fleet as CSV with every column', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+
+    const counter = page.getByTestId('node-count');
+    await expect(counter).not.toHaveText('0');
+    const total = await counter.innerText();
+    await page.getByLabel('Search nodes').fill('west3');
+    // Filtering runs on a deferred value, so wait for it before reading the count.
+    await expect(counter).not.toHaveText(total);
+    const matches = count(await counter.innerText());
+    expect(matches).toBeGreaterThan(0);
+
+    // A hidden column is still exported.
+    await page.getByRole('button', { name: 'Columns' }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Instance name' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('columnheader', { name: 'Instance name', exact: true })).toBeHidden();
+
+    async function exportCsv() {
+      const download = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Export CSV' }).click();
+      const file = await download;
+      const stream = await file.createReadStream();
+      let text = '';
+      for await (const chunk of stream) text += chunk;
+      const [header, ...rows] = text.replace(/^\uFEFF/, '').trimEnd().split('\r\n');
+      return { filename: file.suggestedFilename(), header, rows };
+    }
+
+    // The table starts sorted by name ascending.
+    const ascending = await exportCsv();
+    expect(ascending.filename).toMatch(/^nodes-lab-1-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(ascending.header).toBe(
+      'Name,UUID,Provision state,Power,Instance UUID,Instance name,Maintenance,Maintenance reason',
+    );
+    expect(ascending.rows).toHaveLength(matches);
+    for (const row of ascending.rows) expect(row).toContain('west3');
+
+    await page.getByRole('button', { name: 'Sort by Name' }).click();
+    const firstShown = (await page.getByRole('row').getByRole('link').first().innerText()).trim();
+    const descending = await exportCsv();
+    expect(descending.rows.map((row) => row.split(',')[0])).toEqual(
+      ascending.rows.map((row) => row.split(',')[0]).reverse(),
+    );
+    expect(descending.rows[0]!.split(',')[0]).toBe(firstShown);
+  });
 });
 
 test.describe('node detail', () => {

@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { NodeRow } from '@nodedash/shared';
 import type { SortingState, VisibilityState } from '@tanstack/react-table';
-import { Columns3, Filter, RefreshCw, ServerOff, Wrench } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { Columns3, Download, Filter, RefreshCw, ServerOff, Wrench } from 'lucide-react';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import { SearchInput } from '@/components/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import { Empty, Skeleton, Spinner } from '@/components/ui/misc';
 import { Hint } from '@/components/ui/tooltip';
 import { useSession } from '@/features/auth/session';
 import { DEFAULT_COLUMN_LABELS } from '@/features/nodes/columns';
+import { csvFilename, downloadCsv, nodesToCsv } from '@/features/nodes/csv';
 import {
   applyNodeFilters,
   countActiveFilters,
@@ -61,6 +63,7 @@ export function NodesPage() {
   const [filters, setFilters] = useState<NodeFilters>(EMPTY_FILTERS);
   const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const sortedRowsRef = useRef<() => NodeRow[]>(null);
   const now = useNow();
 
   const rows = query.data ?? [];
@@ -179,6 +182,22 @@ export function NodesPage() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={filtered.length === 0}
+          onClick={() =>
+            downloadCsv(
+              csvFilename(session.data?.region),
+              nodesToCsv(sortedRowsRef.current?.() ?? filtered, DEFAULT_COLUMN_LABELS),
+            )
+          }
+        >
+          <Download className="size-4" />
+          Export CSV
+        </Button>
+
         {activeFilters > 0 ? (
           <Button variant="ghost" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
             Reset filters
@@ -255,6 +274,7 @@ export function NodesPage() {
           onSortingChange={setSorting}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={setColumnVisibility}
+          sortedRowsRef={sortedRowsRef}
         />
       )}
     </div>
