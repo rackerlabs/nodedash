@@ -39,6 +39,9 @@ export const noScope = () =>
 
 export const badRequest = (message: string) => new HttpError(400, 'bad_request', message);
 
+export const rateLimited = () =>
+  new HttpError(429, 'rate_limited', 'Too many requests. Wait a moment and try again.');
+
 export const unsupported = (message: string) => new HttpError(406, 'unsupported', message);
 
 /** Maps an upstream OpenStack status onto our own error vocabulary. */

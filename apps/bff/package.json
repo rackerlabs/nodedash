@@ -11,6 +11,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
     "@fastify/formbody": "^9.0.0",
+    "@fastify/rate-limit": "^11.2.2",
     "@fastify/secure-session": "^8.4.1",
     "@fastify/static": "^10.1.10",
     "@nodedash/shared": "^0.1.0",
