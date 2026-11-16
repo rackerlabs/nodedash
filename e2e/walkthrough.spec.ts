@@ -224,6 +224,7 @@ test.describe('node detail', () => {
 
     const uuid = new URL(page.url()).pathname.split('/').pop()!;
     for (const [tab, heading] of [
+      ['ports', /the switch port it is cabled to/],
       ['inventory', /Network interfaces/],
       ['bios', /Settings as last read by Ironic/],
       ['firmware', /Firmware versions as last reported/],

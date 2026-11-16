@@ -23,6 +23,7 @@ import { NodeBiosPage } from './node/bios';
 import { NodeFirmwarePage } from './node/firmware';
 import { NodeHealthPage } from './node/health';
 import { NodeInventoryPage } from './node/inventory';
+import { NodePortsPage } from './node/ports';
 import { NodeLayout } from './node/layout';
 import { NodeLogsPage } from './node/logs';
 import { NodeOverviewPage } from './node/overview';
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
                 children: [
                   { index: true, element: <NodeOverviewPage /> },
                   { path: 'health', element: <NodeHealthPage /> },
+                  { path: 'ports', element: <NodePortsPage /> },
                   { path: 'inventory', element: <NodeInventoryPage /> },
                   { path: 'bios', element: <NodeBiosPage /> },
                   { path: 'firmware', element: <NodeFirmwarePage /> },

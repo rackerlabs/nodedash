@@ -111,6 +111,40 @@ export const FirmwareListSchema = z.looseObject({
   firmware: z.array(FirmwareComponentSchema),
 });
 
+/**
+ * A baremetal port. `local_link_connection` is what the node's NIC is cabled to;
+ * `physical_network` (1.34), `category` and `vendor` appear only on newer
+ * microversions, so every one of them is optional.
+ */
+export const IronicPortSchema = z.looseObject({
+  uuid: z.string(),
+  address: z.string(),
+  name: z.string().nullish(),
+  node_uuid: z.string().nullish(),
+  portgroup_uuid: z.string().nullish(),
+  pxe_enabled: z.boolean().nullish(),
+  is_smartnic: z.boolean().nullish(),
+  physical_network: z.string().nullish(),
+  category: z.string().nullish(),
+  vendor: z.string().nullish(),
+  local_link_connection: z
+    .looseObject({
+      switch_id: z.string().nullish(),
+      port_id: z.string().nullish(),
+      switch_info: z.string().nullish(),
+    })
+    .nullish(),
+  internal_info: jsonRecord.nullish(),
+  extra: jsonRecord.nullish(),
+  created_at: z.string().nullish(),
+  updated_at: z.string().nullish(),
+});
+export type IronicPort = z.infer<typeof IronicPortSchema>;
+
+export const PortListSchema = z.looseObject({
+  ports: z.array(IronicPortSchema),
+});
+
 export const InventoryDiskSchema = z.looseObject({
   name: z.string().nullish(),
   model: z.string().nullish(),

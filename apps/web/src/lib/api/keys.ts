@@ -25,6 +25,7 @@ export const qk = {
   nodes: (region: string, projectId: string | null) => ['nodes', region, projectId] as const,
   node: (region: string, uuid: string) => ['node', region, uuid] as const,
   inventory: (region: string, uuid: string) => ['node', region, uuid, 'inventory'] as const,
+  ports: (region: string, uuid: string) => ['node', region, uuid, 'ports'] as const,
   bios: (region: string, uuid: string) => ['node', region, uuid, 'bios'] as const,
   firmware: (region: string, uuid: string) => ['node', region, uuid, 'firmware'] as const,
   console: (region: string, uuid: string) => ['node', region, uuid, 'console'] as const,

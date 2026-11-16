@@ -170,6 +170,18 @@ export function registerNodeRoutes(
     },
   );
 
+  /**
+   * The node's ports with every column Ironic has (`detail`), which is what carries
+   * the switch cabling and VIF bookkeeping. Ironic refuses `detail` together with
+   * `fields`, so the whole port is fetched; a node has a handful of them.
+   */
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/ports', async (request) => {
+    const target = await ironicTarget(keystone, request);
+    return ironic.json(target, '/v1/ports', {
+      query: { node_uuid: request.params.uuid, detail: 'true' },
+    });
+  });
+
   app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/inventory', async (request) => {
     const target = await ironicTarget(keystone, request);
     const { capabilities } = await ironic.capabilities(target.endpoint);
