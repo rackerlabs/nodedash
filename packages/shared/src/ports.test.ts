@@ -16,7 +16,7 @@ limitations under the License.
 
 import { describe, expect, it } from 'vitest';
 import type { IronicPort } from './ironic.ts';
-import { portVif, toPortRow } from './ports.ts';
+import { lldpByMac, lldpMismatch, portVif, toPortRow } from './ports.ts';
 
 function port(overrides: Partial<IronicPort> = {}): IronicPort {
   return {
@@ -85,5 +85,88 @@ describe('toPortRow', () => {
       physicalNetwork: 'north1-network',
       category: 'network',
     });
+  });
+});
+
+describe('lldpByMac', () => {
+  const inventory = {
+    interfaces: [
+      { name: 'eno1', mac_address: '02:00:5E:00:53:01' },
+      { name: 'eno2', mac_address: '02:00:5e:00:53:02' },
+    ],
+  };
+
+  it('joins the parsed neighbour of each interface to its MAC, lower-cased', () => {
+    const map = lldpByMac({
+      inventory,
+      plugin_data: {
+        parsed_lldp: {
+          eno1: {
+            switch_system_name: 'sw01.north1.example.invalid',
+            switch_port_id: 'Ethernet1/35',
+            switch_chassis_id: '02:00:5e:00:53:ff',
+          },
+        },
+      },
+    });
+    expect(map.get('02:00:5e:00:53:01')).toEqual({
+      switchName: 'sw01.north1.example.invalid',
+      switchPort: 'Ethernet1/35',
+      chassisId: '02:00:5e:00:53:ff',
+    });
+    expect(map.has('02:00:5e:00:53:02')).toBe(false);
+  });
+
+  it('treats the "Not Available" placeholder as no neighbour', () => {
+    const map = lldpByMac({
+      inventory,
+      plugin_data: {
+        parsed_lldp: {
+          eno1: { switch_chassis_id: 'Not Available', switch_port_id: 'Not Available' },
+          eno2: { switch_chassis_id: '02:00:5e:00:53:ff', switch_port_id: 'Ethernet1/35' },
+        },
+      },
+    });
+    expect([...map.keys()]).toEqual(['02:00:5e:00:53:02']);
+    expect(map.get('02:00:5e:00:53:02')).toEqual({
+      switchName: null,
+      switchPort: 'Ethernet1/35',
+      chassisId: '02:00:5e:00:53:ff',
+    });
+  });
+
+  it('is empty when inspection recorded no LLDP', () => {
+    expect(lldpByMac(null).size).toBe(0);
+    expect(lldpByMac({ inventory, plugin_data: {} }).size).toBe(0);
+    expect(lldpByMac({ inventory, plugin_data: { parsed_lldp: 'nope' } }).size).toBe(0);
+  });
+});
+
+describe('lldpMismatch', () => {
+  const configured = {
+    switchName: 'sw01.north1.example.invalid',
+    switchId: '02:00:5e:00:53:ff',
+    switchPort: 'Ethernet1/35',
+  };
+  const seen = {
+    switchName: 'SW01.north1.example.invalid',
+    switchPort: 'Ethernet1/35',
+    chassisId: '02:00:5E:00:53:FF',
+  };
+
+  it('is false when the switch reports what Ironic has, ignoring case', () => {
+    expect(lldpMismatch(configured, seen)).toBe(false);
+  });
+
+  it('flags a different port or a different switch', () => {
+    expect(lldpMismatch(configured, { ...seen, switchPort: 'Ethernet1/51' })).toBe(true);
+    expect(lldpMismatch(configured, { ...seen, switchName: 'sw02.north1.example.invalid' })).toBe(true);
+    expect(lldpMismatch(configured, { ...seen, chassisId: '02:00:5e:00:53:aa' })).toBe(true);
+  });
+
+  it('never flags missing data', () => {
+    expect(lldpMismatch(configured, null)).toBe(false);
+    expect(lldpMismatch(configured, { switchName: null, switchPort: null, chassisId: null })).toBe(false);
+    expect(lldpMismatch({ switchName: null, switchId: null, switchPort: null }, seen)).toBe(false);
   });
 });

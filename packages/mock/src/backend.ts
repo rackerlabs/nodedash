@@ -46,6 +46,7 @@ import {
 import {
   buildFixtures,
   supportAssistFilename,
+  withPortLldp,
   vendorPassthruMethodsFor,
   type Fixtures,
 } from './fixtures.ts';
@@ -547,7 +548,7 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
           'No introspection data stored for this node. Run inspection to collect inventory.',
         );
       }
-      return inventory;
+      return withPortLldp(inventory, fixtures.ports(node.uuid));
     },
 
     getPorts(uuid: string) {
