@@ -58,6 +58,7 @@ interface TabDefinition {
 const TABS: TabDefinition[] = [
   { to: '', label: 'Overview', end: true },
   { to: 'health', label: 'Health' },
+  { to: 'ports', label: 'Ports' },
   { to: 'inventory', label: 'Inventory', capability: 'inventory' },
   { to: 'bios', label: 'BIOS' },
   { to: 'firmware', label: 'Firmware', capability: 'firmware' },

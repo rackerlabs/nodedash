@@ -185,6 +185,9 @@ export const handlers = [
   http.get('/api/nodes/:region/:uuid/inventory', ({ params }) =>
     respond(() => backend.getInventory(String(params.uuid)), { read: true }),
   ),
+  http.get('/api/nodes/:region/:uuid/ports', ({ params }) =>
+    respond(() => backend.getPorts(String(params.uuid)), { read: true }),
+  ),
   http.get('/api/nodes/:region/:uuid/bios', ({ params }) =>
     respond(() => backend.getBios(String(params.uuid)), { read: true }),
   ),

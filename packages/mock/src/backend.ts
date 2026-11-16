@@ -141,6 +141,7 @@ export interface MockBackend {
   clearMaintenance(uuid: string): IronicNode;
   setPower(uuid: string, target: PowerTarget): void;
   getInventory(uuid: string): unknown;
+  getPorts(uuid: string): unknown;
   getBios(uuid: string): unknown;
   getFirmware(uuid: string): unknown;
   listRunbooks(): unknown;
@@ -547,6 +548,11 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
         );
       }
       return inventory;
+    },
+
+    getPorts(uuid: string) {
+      const node = nodeInScope(uuid);
+      return { ports: fixtures.ports(node.uuid) };
     },
 
     getBios(uuid: string) {

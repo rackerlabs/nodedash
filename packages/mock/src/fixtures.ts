@@ -20,6 +20,7 @@ import {
   type Domain,
   type FirmwareComponent,
   type IronicNode,
+  type IronicPort,
   type NodeInventory,
   type Project,
   type Runbook,
@@ -56,6 +57,11 @@ export interface Fixtures {
    * data a reviewer will look at on a handful of nodes.
    */
   diagnostics: (uuid: string) => Diagnostics | null;
+  /**
+   * A node's ports. Built per node from its own seed rather than in the node loop, so
+   * adding them did not shift any fixture drawn after the loop.
+   */
+  ports: (uuid: string) => IronicPort[];
 }
 
 /**
@@ -489,6 +495,11 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
     bios,
     firmware,
     supportAssist,
+    ports(uuid: string) {
+      const node = nodesByUuid.get(uuid);
+      if (!node) return [];
+      return buildPorts(createRng(options.seed + hashUuid(uuid) + 1), node);
+    },
     diagnostics(uuid: string) {
       const node = nodesByUuid.get(uuid);
       if (!node) return null;
@@ -841,4 +852,51 @@ function buildSupportAssistHistory(rng: Rng, node: IronicNode): SupportAssistCol
   }
 
   return collections;
+}
+
+/**
+ * Two to four NICs cabled to a pair of top-of-rack switches. Switch names and ids
+ * are made up (`.example.invalid`, locally administered MACs). An active node has a
+ * tenant VIF on every port that is not the PXE one, and neighbouring ports are
+ * sometimes bonded into a portgroup, as they would be for a LAG.
+ */
+function buildPorts(rng: Rng, node: IronicNode): IronicPort[] {
+  if (node.provision_state === 'enroll') return [];
+
+  const site = node.conductor_group ?? 'north1';
+  const rack = String((node.extra as { rack?: string } | null)?.rack ?? `${site}-r01`);
+  const switches = [0, 1].map((side) => ({
+    id: `02:${rng.hex(2)}:${rng.hex(2)}:${rng.hex(2)}:${rng.hex(2)}:${rng.hex(2)}`,
+    info: `${rack}-sw${side + 1}.${site}.example.invalid`,
+  }));
+  const portgroup = rng.bool(0.5) ? rng.uuid() : null;
+  const count = 2 + rng.int(3);
+  const active = node.provision_state === 'active';
+  const created = node.created_at ?? new Date(0).toISOString();
+
+  return Array.from({ length: count }, (_, index) => {
+    const pxe = index === 0;
+    const link = switches[index % switches.length]!;
+    return {
+      uuid: rng.uuid(),
+      address: `02:${rng.hex(2)}:${rng.hex(2)}:${rng.hex(2)}:${rng.hex(2)}:${rng.hex(2)}`,
+      name: `${node.name}:NIC.Slot.${index + 1}-1-1`,
+      node_uuid: node.uuid,
+      portgroup_uuid: index < 2 ? portgroup : null,
+      pxe_enabled: pxe,
+      is_smartnic: false,
+      physical_network: `${rack}-network`,
+      category: 'network',
+      vendor: null,
+      local_link_connection: {
+        switch_id: link.id,
+        port_id: `Ethernet1/${10 + rng.int(40)}`,
+        switch_info: link.info,
+      },
+      internal_info: active && !pxe ? { tenant_vif_port_id: rng.uuid() } : {},
+      extra: { bios_name: `NIC.Slot.${index + 1}-1` },
+      created_at: created,
+      updated_at: node.updated_at ?? created,
+    };
+  });
 }

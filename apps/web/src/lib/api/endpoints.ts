@@ -21,6 +21,7 @@ import {
   LocateResultSchema,
   NodeConsoleSchema,
   NodeInventorySchema,
+  PortListSchema,
   NodeListSchema,
   NodeSchema,
   RunbookListSchema,
@@ -126,6 +127,9 @@ export const api = {
 
   inventory: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/inventory`, { schema: NodeInventorySchema }),
+
+  ports: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/ports`, { schema: PortListSchema }),
 
   bios: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/bios`, { schema: BiosSettingsListSchema }),
