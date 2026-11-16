@@ -548,7 +548,8 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
           'No introspection data stored for this node. Run inspection to collect inventory.',
         );
       }
-      return withPortLldp(inventory, fixtures.ports(node.uuid));
+      const withLldp = withPortLldp(inventory, fixtures.ports(node.uuid));
+      return { ...withLldp, inventory: { ...withLldp.inventory, pci_devices: fixtures.pciDevices(node.uuid) } };
     },
 
     getPorts(uuid: string) {
