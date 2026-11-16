@@ -28,9 +28,26 @@ import { useRegion } from '@/lib/paths';
 
 const dash = <span className="text-muted-foreground">—</span>;
 
-// Where the cable goes comes first; physical network and category are for
-// troubleshooting, so they sit at the end.
+// Identity first (MAC, then NIC), then where the cable goes; physical network and
+// category are for troubleshooting, so they sit at the end.
 const columns: Array<DataColumn<PortRow>> = [
+  {
+    id: 'address',
+    header: 'MAC',
+    width: '12rem',
+    value: (port) => port.address,
+    render: (port) => (
+      <CopyValue value={port.address} label="Copy MAC address" className="font-mono text-[12px]" />
+    ),
+  },
+  {
+    id: 'name',
+    header: 'NIC',
+    width: 'minmax(12rem, 1.2fr)',
+    value: (port) => port.name ?? '',
+    render: (port) =>
+      port.name ? <span className="truncate font-mono text-[12px]">{port.name}</span> : dash,
+  },
   {
     id: 'switch',
     header: 'Switch',
@@ -54,23 +71,6 @@ const columns: Array<DataColumn<PortRow>> = [
     value: (port) => port.switchPort ?? '',
     render: (port) =>
       port.switchPort ? <span className="font-mono text-[12px]">{port.switchPort}</span> : dash,
-  },
-  {
-    id: 'name',
-    header: 'NIC',
-    width: 'minmax(12rem, 1.2fr)',
-    value: (port) => port.name ?? '',
-    render: (port) =>
-      port.name ? <span className="truncate font-mono text-[12px]">{port.name}</span> : dash,
-  },
-  {
-    id: 'address',
-    header: 'MAC',
-    width: '12rem',
-    value: (port) => port.address,
-    render: (port) => (
-      <CopyValue value={port.address} label="Copy MAC address" className="font-mono text-[12px]" />
-    ),
   },
   {
     id: 'vif',
