@@ -34,6 +34,9 @@ describe('sanitizeNext', () => {
   it('refuses anything that could leave the site', () => {
     for (const value of [
       '//evil.example/phish',
+      '/\\evil.example/phish',
+      '/\t/evil.example/phish',
+      '/\n/evil.example/phish',
       'https://evil.example',
       'javascript:alert(1)',
       '',

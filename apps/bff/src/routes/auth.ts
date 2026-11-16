@@ -29,6 +29,9 @@ import { sessionView } from '../session-view.ts';
  */
 export function sanitizeNext(next: unknown): string {
   if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//')) return '/nodes';
+  // Browsers read `/\host` as `//host`, and drop tabs and newlines before parsing,
+  // so `/<tab>/host` is protocol-relative too.
+  if (/[\\\u0000-\u0020\u007f]/.test(next)) return '/nodes';
   return next;
 }
 
