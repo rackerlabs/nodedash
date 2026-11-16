@@ -236,6 +236,35 @@ test.describe('node detail', () => {
     }
   });
 
+  test('names PCI devices from pci.ids and leaves bridges out', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    await openFirstNode(page);
+
+    const uuid = new URL(page.url()).pathname.split('/').pop()!;
+    await page.goto(`/nodes/lab-1/${uuid}/inventory`);
+
+    const table = page.getByRole('table', { name: 'PCI devices' });
+    await expect(table.getByText('MT2892 Family [ConnectX-6 Dx]').first()).toBeVisible();
+    await expect(table.getByText('Mellanox Technologies').first()).toBeVisible();
+    // Unknown to pci.ids, so it falls back to the raw ids.
+    await expect(table.getByText('feed:0001')).toBeVisible();
+    await expect(table.getByText(/Root Complex|GPP Bridge/)).toHaveCount(0);
+    await expect(page.getByText(/\d+ bridges hidden/)).toBeVisible();
+
+    // Rows are separate grids, so a long name must not push its row's columns out of line.
+    const rows = table.getByRole('row');
+    const count = await rows.count();
+    for (let column = 0; column < 6; column += 1) {
+      const lefts = new Set<number>();
+      for (let row = 1; row < count; row += 1) {
+        const box = await rows.nth(row).getByRole('cell').nth(column).boundingBox();
+        lefts.add(Math.round(box!.x));
+      }
+      expect(lefts.size, `column ${column} is aligned across rows`).toBe(1);
+    }
+  });
+
   test('sets and clears maintenance mode with a reason', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);

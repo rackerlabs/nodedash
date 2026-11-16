@@ -21,6 +21,7 @@ import {
   type FirmwareComponent,
   type IronicNode,
   type IronicPort,
+  type PciDevice,
   type NodeInventory,
   type Project,
   type Runbook,
@@ -62,6 +63,8 @@ export interface Fixtures {
    * adding them did not shift any fixture drawn after the loop.
    */
   ports: (uuid: string) => IronicPort[];
+  /** A node's PCI devices, from its own seed for the same reason as `ports`. */
+  pciDevices: (uuid: string) => PciDevice[];
 }
 
 /**
@@ -492,6 +495,10 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
     bios,
     firmware,
     supportAssist,
+    pciDevices(uuid: string) {
+      if (!nodesByUuid.has(uuid)) return [];
+      return buildPciDevices(createRng(options.seed + hashUuid(uuid) + 2));
+    },
     ports(uuid: string) {
       const node = nodesByUuid.get(uuid);
       if (!node) return [];
@@ -928,4 +935,43 @@ export function withPortLldp(data: NodeInventory, ports: IronicPort[]): NodeInve
     inventory: { ...data.inventory, interfaces },
     plugin_data: { ...data.plugin_data, parsed_lldp: parsed },
   };
+}
+
+/**
+ * Public ids that pci.ids knows, in the shape Ironic reports them (0x-prefixed hex,
+ * class as a Python enum name, no bus address). Every node gets plenty of bridges,
+ * which the UI hides, plus one device whose ids no database knows.
+ */
+function buildPciDevices(rng: Rng): PciDevice[] {
+  const device = (
+    deviceClass: string,
+    vendor: string,
+    product: string,
+    subsystem: [string, string] = ['0x0000', '0x0000'],
+  ): PciDevice => ({
+    class: `DeviceClass.${deviceClass}`,
+    vendor_id: vendor,
+    product_id: product,
+    subsystem_vendor_id: subsystem[0],
+    subsystem_id: subsystem[1],
+    revision: `0x${rng.hex(2)}`,
+  });
+
+  const devices = [
+    device('BRIDGE', '0x1022', '0x1480'),
+    ...Array.from({ length: 6 + rng.int(8) }, () => device('BRIDGE', '0x1022', '0x1483')),
+    device('BRIDGE', '0x1022', '0x790e'),
+    device('NETWORK_CONTROLLER', '0x15b3', '0x101d'),
+    device('NETWORK_CONTROLLER', '0x15b3', '0x101d'),
+    device('MASS_STORAGE_CONTROLLER', '0x1000', '0x10e2'),
+    device('DISPLAY_CONTROLLER', '0x1a03', '0x2000'),
+    device('MASS_STORAGE_CONTROLLER', '0x144d', '0xa80a'),
+    // Long vendor, device and subsystem names, which is what stresses the table's column widths.
+    device('NETWORK_CONTROLLER', '0x14e4', '0x16d7', ['0x14e4', '0x1402']),
+    device('MASS_STORAGE_CONTROLLER', '0x1022', '0x7901'),
+  ];
+  if (rng.bool(0.5)) devices.push(device('NETWORK_CONTROLLER', '0x8086', '0x1593'));
+  // Not in any database: a reviewer sees the raw-id fallback.
+  devices.push(device('SERIAL_BUS_CONTROLLER', '0xfeed', '0x0001'));
+  return devices;
 }

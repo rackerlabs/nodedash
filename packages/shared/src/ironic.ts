@@ -168,6 +168,17 @@ export const InventoryInterfaceSchema = z.looseObject({
   product: z.string().nullish(),
 });
 
+/** Ids arrive as `0x`-prefixed hex strings; `class` is a Python enum name. */
+export const PciDeviceSchema = z.looseObject({
+  class: z.string().nullish(),
+  vendor_id: z.string().nullish(),
+  product_id: z.string().nullish(),
+  subsystem_vendor_id: z.string().nullish(),
+  subsystem_id: z.string().nullish(),
+  revision: z.string().nullish(),
+});
+export type PciDevice = z.infer<typeof PciDeviceSchema>;
+
 export const InventorySchema = z.looseObject({
   hostname: z.string().nullish(),
   memory: z
@@ -187,6 +198,7 @@ export const InventorySchema = z.looseObject({
     .nullish(),
   disks: z.array(InventoryDiskSchema).nullish(),
   interfaces: z.array(InventoryInterfaceSchema).nullish(),
+  pci_devices: z.array(PciDeviceSchema).nullish(),
   system_vendor: z
     .looseObject({
       product_name: z.string().nullish(),

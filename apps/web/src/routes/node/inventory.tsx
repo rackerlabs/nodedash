@@ -15,9 +15,18 @@ limitations under the License.
 */
 
 import { useQuery } from '@tanstack/react-query';
-import { lldpByMac, lldpMismatch, toPortRow, type PortLldp } from '@nodedash/shared';
+import {
+  isPciBridge,
+  lldpByMac,
+  lldpMismatch,
+  lookupPci,
+  normalizePciId,
+  pciClassLabel,
+  toPortRow,
+  type PortLldp,
+} from '@nodedash/shared';
 import { useMemo } from 'react';
-import { Cpu, HardDrive, MemoryStick, Network, RefreshCw, ScanSearch } from 'lucide-react';
+import { CircuitBoard, Cpu, HardDrive, MemoryStick, Network, RefreshCw, ScanSearch } from 'lucide-react';
 import { DataTable, type DataColumn } from '@/components/data-table';
 import { JsonViewer } from '@/components/json-viewer';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, Field, Skeleton } from '@/components/ui/misc';
 import { isNotFound } from '@/lib/api/client';
+import { usePciIds } from '@/features/node/use-pci-ids';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
 import { formatBytes } from '@/lib/format';
@@ -39,6 +49,26 @@ type Interface = NonNullable<
 >[number];
 /** An interface plus what its switch reported over LLDP, and whether that disagrees with Ironic's port. */
 type NicRow = Interface & { lldp: PortLldp | null; lldpMismatch: boolean };
+
+/**
+ * Every table row is its own grid sized to its content, so one long name widens that
+ * row's columns and shifts it out of line with the others. Not letting the cell
+ * contribute its text width to the row keeps every row on the same tracks; the text
+ * is cut off with an ellipsis instead (the full name is in the title).
+ */
+const CLIP = '[contain:inline-size]';
+
+/** A non-bridge PCI device with the names pci.ids gives its ids; unknown ids leave a name null. */
+interface PciRow {
+  key: string;
+  className: string | null;
+  vendor: string | null;
+  device: string | null;
+  subsystem: string | null;
+  vendorId: string | null;
+  productId: string | null;
+  revision: string | null;
+}
 
 function useInventory(uuid: string) {
   const region = useRegion();
@@ -61,6 +91,27 @@ export function NodeInventoryPage() {
     staleTime: 60_000,
     retry: false,
   });
+  const pciIds = usePciIds();
+  const pciDevices = query.data?.inventory.pci_devices;
+  const { pciRows, bridgeCount } = useMemo(() => {
+    const devices = pciDevices ?? [];
+    const rows: PciRow[] = devices
+      .filter((device) => !isPciBridge(device))
+      .map((device, index) => {
+        const names = pciIds.data
+          ? lookupPci(pciIds.data, device)
+          : { vendor: null, device: null, subsystem: null };
+        return {
+          key: String(index),
+          className: pciClassLabel(device.class),
+          ...names,
+          vendorId: normalizePciId(device.vendor_id),
+          productId: normalizePciId(device.product_id),
+          revision: device.revision ?? null,
+        };
+      });
+    return { pciRows: rows, bridgeCount: devices.length - rows.length };
+  }, [pciDevices, pciIds.data]);
   const nics = useMemo<NicRow[]>(() => {
     const lldp = lldpByMac(query.data);
     const configured = new Map(
@@ -217,6 +268,80 @@ export function NodeInventoryPage() {
     },
   ];
 
+  const pciColumns: Array<DataColumn<PciRow>> = [
+    {
+      id: 'class',
+      header: 'Class',
+      width: 'minmax(11rem, 1fr)',
+      className: CLIP,
+      value: (row) => row.className ?? '',
+      render: (row) => <span className="block truncate">{row.className ?? '—'}</span>,
+    },
+    {
+      id: 'vendor',
+      header: 'Vendor',
+      width: 'minmax(16rem, 1fr)',
+      className: CLIP,
+      value: (row) => row.vendor ?? row.vendorId ?? '',
+      render: (row) =>
+        row.vendor ? (
+          <span className="block truncate" title={row.vendor}>
+            {row.vendor}
+          </span>
+        ) : (
+          <span className="font-mono text-[12px] text-muted-foreground">{row.vendorId ?? '—'}</span>
+        ),
+    },
+    {
+      id: 'device',
+      header: 'Device',
+      width: 'minmax(26rem, 2fr)',
+      className: CLIP,
+      value: (row) => row.device ?? row.productId ?? '',
+      render: (row) =>
+        row.device ? (
+          <span className="block truncate" title={row.device}>
+            {row.device}
+          </span>
+        ) : (
+          <span className="font-mono text-[12px] text-muted-foreground">{row.productId ?? '—'}</span>
+        ),
+    },
+    {
+      id: 'subsystem',
+      header: 'Subsystem',
+      width: 'minmax(18rem, 1.5fr)',
+      className: CLIP,
+      value: (row) => row.subsystem ?? '',
+      render: (row) =>
+        row.subsystem ? (
+          <span className="block truncate text-muted-foreground" title={row.subsystem}>
+            {row.subsystem}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: 'ids',
+      header: 'ID',
+      width: '9rem',
+      value: (row) => `${row.vendorId ?? ''}:${row.productId ?? ''}`,
+      render: (row) => (
+        <span className="font-mono text-[12px]">
+          {row.vendorId ?? '????'}:{row.productId ?? '????'}
+        </span>
+      ),
+    },
+    {
+      id: 'revision',
+      header: 'Rev',
+      width: '6rem',
+      value: (row) => row.revision ?? '',
+      render: (row) => <span className="font-mono text-[12px]">{row.revision ?? '—'}</span>,
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
@@ -307,6 +432,27 @@ export function NodeInventoryPage() {
           searchPlaceholder="Filter interfaces…"
           initialSort={{ columnId: 'name' }}
           emptyTitle="No interfaces reported"
+        />
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <CircuitBoard className="size-4 text-muted-foreground" />
+          PCI devices
+          {bridgeCount > 0 ? (
+            <span className="text-xs font-normal text-muted-foreground">
+              {bridgeCount} {bridgeCount === 1 ? 'bridge' : 'bridges'} hidden
+            </span>
+          ) : null}
+        </h2>
+        <DataTable
+          rows={pciRows}
+          columns={pciColumns}
+          getRowId={(row) => row.key}
+          ariaLabel="PCI devices"
+          searchPlaceholder="Filter PCI devices…"
+          initialSort={{ columnId: 'class' }}
+          emptyTitle="No PCI devices reported"
         />
       </section>
 

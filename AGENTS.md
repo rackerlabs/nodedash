@@ -32,6 +32,7 @@ npm run test:e2e    # Playwright, mock backend
 npm run build
 helm lint charts/nodedash -f charts/nodedash/ci/test-values.yaml
 docker build -t nodedash .
+npm run update:pci-ids  # refresh apps/web/src/data/pci.ids and its version in NOTICE
 ```
 
 Run `npm run typecheck`, `npm test` and `npm run test:e2e` before calling a change done. Change the chart, and

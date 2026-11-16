@@ -21,6 +21,7 @@ export * from './keystone.ts';
 export * from './microversion.ts';
 export * from './node-logs.ts';
 export * from './nodes.ts';
+export * from './pci.ts';
 export * from './ports.ts';
 export * from './support-assist.ts';
 export * from './tone.ts';
