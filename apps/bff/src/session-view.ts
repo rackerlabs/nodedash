@@ -36,7 +36,6 @@ export function sessionView(request: FastifyRequest, config: Config): Session {
           idp: identity!.idp,
         }
       : null,
-    region: authenticated ? (request.session.region ?? null) : null,
     scope: authenticated ? (request.session.scope ?? null) : null,
     lastScope: authenticated ? (request.session.lastScope ?? null) : null,
     expiresAt: authenticated ? identity!.expiresAt : null,

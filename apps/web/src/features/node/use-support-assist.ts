@@ -23,6 +23,7 @@ import {
 } from '@nodedash/shared';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
+import { useRegion } from '@/lib/paths';
 
 /**
  * A collection runs for around half an hour, so polling is deliberately unhurried:
@@ -37,9 +38,10 @@ const ACTIVE_POLL_MS = 10_000;
  * that is what actually decides it.
  */
 export function useSupportAssistSupported(uuid: string, options: { enabled?: boolean } = {}) {
+  const region = useRegion();
   const query = useQuery({
-    queryKey: qk.vendorPassthru(uuid),
-    queryFn: () => api.vendorPassthruMethods(uuid),
+    queryKey: qk.vendorPassthru(region, uuid),
+    queryFn: () => api.vendorPassthruMethods(region, uuid),
     // Held back until the node has resolved: asking before a project is selected
     // would fail, and this query does not retry.
     enabled: options.enabled ?? true,
@@ -54,11 +56,12 @@ export function useSupportAssistSupported(uuid: string, options: { enabled?: boo
 }
 
 export function useSupportAssist(uuid: string, options: { enabled: boolean }) {
+  const region = useRegion();
   const client = useQueryClient();
 
   const query = useQuery({
-    queryKey: qk.supportAssist(uuid),
-    queryFn: () => api.supportAssist(uuid),
+    queryKey: qk.supportAssist(region, uuid),
+    queryFn: () => api.supportAssist(region, uuid),
     enabled: options.enabled,
     refetchInterval: (result) =>
       (result.state.data?.collections ?? []).some((collection) =>
@@ -71,8 +74,8 @@ export function useSupportAssist(uuid: string, options: { enabled: boolean }) {
   });
 
   const start = useMutation({
-    mutationFn: (request: SupportAssistStartRequest) => api.startSupportAssist(uuid, request),
-    onSuccess: () => void client.invalidateQueries({ queryKey: qk.supportAssist(uuid) }),
+    mutationFn: (request: SupportAssistStartRequest) => api.startSupportAssist(region, uuid, request),
+    onSuccess: () => void client.invalidateQueries({ queryKey: qk.supportAssist(region, uuid) }),
   });
 
   return { query, start };

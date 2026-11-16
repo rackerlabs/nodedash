@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Session } from '@nodedash/shared';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
+import { useRegion } from '@/lib/paths';
 
 export function useSession() {
   return useQuery({
@@ -29,13 +30,13 @@ export function useSession() {
 
 export function useCapabilities() {
   const session = useSession();
-  const region = session.data?.region ?? null;
+  const region = useRegion();
   const projectId = session.data?.scope?.projectId ?? null;
   return useQuery({
     queryKey: qk.capabilities(region, projectId),
-    queryFn: () => api.capabilities(),
+    queryFn: () => api.capabilities(region),
     // The BFF needs a project to find the region's Ironic in the catalog.
-    enabled: Boolean(region && projectId),
+    enabled: Boolean(projectId),
     // Microversion support only changes when the server is upgraded.
     staleTime: 10 * 60_000,
   });
@@ -47,20 +48,6 @@ export function useRegions(enabled = true) {
     queryFn: () => api.regions(),
     enabled,
     staleTime: 10 * 60_000,
-  });
-}
-
-export function useSetRegion() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (region: string) => api.setRegion(region),
-    onSuccess: (session: Session) => {
-      queryClient.setQueryData(qk.session, session);
-      // A new region means a different Ironic: nothing node-shaped carries over.
-      void queryClient.invalidateQueries({ queryKey: ['nodes'] });
-      void queryClient.invalidateQueries({ queryKey: ['node'] });
-      void queryClient.invalidateQueries({ queryKey: ['runbooks'] });
-    },
   });
 }
 

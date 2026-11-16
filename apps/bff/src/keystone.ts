@@ -98,13 +98,17 @@ export interface ScopedToken {
  * The Ironic endpoint a scoped token should talk to in a region. The catalog can
  * differ per project, so this is checked per token rather than once per region.
  */
-export function ironicEndpointFor(scoped: ScopedToken, region: string): string {
-  const endpoint = scoped.ironicEndpoints[region];
+export function ironicEndpointFor(
+  ironicEndpoints: Record<string, string>,
+  projectName: string,
+  region: string,
+): string {
+  const endpoint = ironicEndpoints[region];
   if (!endpoint) {
     throw new HttpError(
       404,
       'not_found',
-      `Project ${scoped.projectName} has no bare metal (Ironic) endpoint in region ${region}.`,
+      `Project ${projectName} has no bare metal (Ironic) endpoint in region ${region}.`,
     );
   }
   return endpoint;

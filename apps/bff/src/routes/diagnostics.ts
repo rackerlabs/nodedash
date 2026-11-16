@@ -21,6 +21,7 @@ import type { KeystoneClient } from '../keystone.ts';
 import { ironicTarget, nodePath } from '../node-request.ts';
 
 interface NodeParams {
+  region: string;
   uuid: string;
 }
 
@@ -41,7 +42,7 @@ export function registerDiagnosticsRoutes(
   ironic: IronicClient,
 ): void {
   app.get<{ Params: NodeParams; Querystring: { limit?: string } }>(
-    '/api/nodes/:uuid/history',
+    '/api/nodes/:region/:uuid/history',
     async (request) => {
       const target = await ironicTarget(keystone, request);
       const { capabilities } = await ironic.capabilities(target.endpoint);
@@ -54,13 +55,13 @@ export function registerDiagnosticsRoutes(
     },
   );
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/logs', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/logs', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json(target, nodePath(request.params.uuid, '/logs'));
   });
 
   app.get<{ Params: NodeParams & { id: string } }>(
-    '/api/nodes/:uuid/logs/:id',
+    '/api/nodes/:region/:uuid/logs/:id',
     async (request) => {
       const target = await ironicTarget(keystone, request);
       return ironic.json(
@@ -70,12 +71,12 @@ export function registerDiagnosticsRoutes(
     },
   );
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/health', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/health', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json(target, nodePath(request.params.uuid, '/health'));
   });
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/log-services', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/log-services', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json(target, nodePath(request.params.uuid, '/log_services'));
   });
@@ -83,7 +84,7 @@ export function registerDiagnosticsRoutes(
   app.get<{
     Params: NodeParams & { serviceId: string };
     Querystring: { limit?: string; marker?: string; severity?: string };
-  }>('/api/nodes/:uuid/log-services/:serviceId/entries', async (request) => {
+  }>('/api/nodes/:region/:uuid/log-services/:serviceId/entries', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json(
       target,

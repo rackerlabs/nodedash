@@ -49,13 +49,15 @@ import { Label, Spinner } from '@/components/ui/misc';
 import { errorMessage } from '@/lib/api/client';
 import { api } from '@/lib/api/endpoints';
 import { useNodeInvalidator } from './use-node';
+import { useRegion } from '@/lib/paths';
 
 export function PowerMenu({ node, disabled }: { node: NodeRow; disabled?: boolean }) {
+  const region = useRegion();
   const [pendingTarget, setPendingTarget] = useState<PowerTarget | null>(null);
   const invalidate = useNodeInvalidator(node.uuid);
 
   const power = useMutation({
-    mutationFn: (target: PowerTarget) => api.setPower(node.uuid, target),
+    mutationFn: (target: PowerTarget) => api.setPower(region, node.uuid, target),
     onSuccess: (_result, target) => {
       toast.success(`${POWER_TARGET_LABELS[target]} requested`, {
         description: `Ironic is applying the change to ${nodeDisplayName(node)}.`,

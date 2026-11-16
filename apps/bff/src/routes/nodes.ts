@@ -31,6 +31,7 @@ import { ironicTarget, nodePath, rememberScopedToken } from '../node-request.ts'
 import { requireRegion } from '../session.ts';
 
 interface NodeParams {
+  region: string;
   uuid: string;
 }
 
@@ -41,12 +42,12 @@ export function registerNodeRoutes(
   ironic: IronicClient,
 ): void {
   /** What the selected region's Ironic supports; regions can run different releases. */
-  app.get('/api/capabilities', async (request) => {
+  app.get('/api/capabilities/:region', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.capabilities(target.endpoint);
   });
 
-  app.get<{ Querystring: { limit?: string; marker?: string } }>('/api/nodes', async (request) => {
+  app.get<{ Querystring: { limit?: string; marker?: string } }>('/api/nodes/:region', async (request) => {
     const target = await ironicTarget(keystone, request);
     const limit = request.query.limit ? Number(request.query.limit) : undefined;
     return ironic.allNodes(target, {
@@ -55,7 +56,7 @@ export function registerNodeRoutes(
     });
   });
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json<IronicNode>(target, nodePath(request.params.uuid));
   });
@@ -64,7 +65,7 @@ export function registerNodeRoutes(
    * Resolves a bare node uuid to the project that owns it, for shared links that
    * arrive with no project selected.
    */
-  app.post<{ Params: NodeParams }>('/api/nodes/:uuid/locate', async (request): Promise<LocateResult> => {
+  app.post<{ Params: NodeParams }>('/api/nodes/:region/:uuid/locate', async (request): Promise<LocateResult> => {
     const auth = requireRegion(request);
     const projects = await keystone.listProjects(auth.unscopedToken);
 
@@ -99,7 +100,7 @@ export function registerNodeRoutes(
   });
 
   app.put<{ Params: NodeParams; Body: { reason?: string } }>(
-    '/api/nodes/:uuid/maintenance',
+    '/api/nodes/:region/:uuid/maintenance',
     async (request) => {
       const reason = request.body?.reason?.trim();
       if (!reason) throw badRequest('A maintenance reason is required.');
@@ -124,7 +125,7 @@ export function registerNodeRoutes(
     },
   );
 
-  app.delete<{ Params: NodeParams }>('/api/nodes/:uuid/maintenance', async (request) => {
+  app.delete<{ Params: NodeParams }>('/api/nodes/:region/:uuid/maintenance', async (request) => {
     const target = await ironicTarget(keystone, request);
     audit(request, {
       action: 'node.maintenance.clear',
@@ -141,7 +142,7 @@ export function registerNodeRoutes(
   });
 
   app.put<{ Params: NodeParams; Body: { target?: string } }>(
-    '/api/nodes/:uuid/power',
+    '/api/nodes/:region/:uuid/power',
     async (request, reply) => {
       const powerTarget = request.body?.target;
       if (!powerTarget || !(POWER_TARGETS as readonly string[]).includes(powerTarget)) {
@@ -169,7 +170,7 @@ export function registerNodeRoutes(
     },
   );
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/inventory', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/inventory', async (request) => {
     const target = await ironicTarget(keystone, request);
     const { capabilities } = await ironic.capabilities(target.endpoint);
     if (!capabilities.inventory) {
@@ -178,12 +179,12 @@ export function registerNodeRoutes(
     return ironic.json(target, nodePath(request.params.uuid, '/inventory'));
   });
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/bios', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/bios', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json(target, nodePath(request.params.uuid, '/bios'));
   });
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/firmware', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/firmware', async (request) => {
     const target = await ironicTarget(keystone, request);
     const { capabilities } = await ironic.capabilities(target.endpoint);
     if (!capabilities.firmware) {
@@ -192,7 +193,7 @@ export function registerNodeRoutes(
     return ironic.json(target, nodePath(request.params.uuid, '/firmware'));
   });
 
-  app.get('/api/runbooks', async (request) => {
+  app.get('/api/runbooks/:region', async (request) => {
     const target = await ironicTarget(keystone, request);
     const { capabilities } = await ironic.capabilities(target.endpoint);
     if (!capabilities.runbooks) {
@@ -202,7 +203,7 @@ export function registerNodeRoutes(
   });
 
   app.put<{ Params: NodeParams; Body: { runbook?: string } }>(
-    '/api/nodes/:uuid/service',
+    '/api/nodes/:region/:uuid/service',
     async (request, reply) => {
       const runbook = request.body?.runbook?.trim();
       if (!runbook) throw badRequest('A runbook name or uuid is required.');
@@ -233,13 +234,13 @@ export function registerNodeRoutes(
     },
   );
 
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/console', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/console', async (request) => {
     const target = await ironicTarget(keystone, request);
     return ironic.json(target, nodePath(request.params.uuid, '/states/console'));
   });
 
   app.put<{ Params: NodeParams; Body: { enabled?: boolean } }>(
-    '/api/nodes/:uuid/console',
+    '/api/nodes/:region/:uuid/console',
     async (request, reply) => {
       const enabled = request.body?.enabled;
       if (typeof enabled !== 'boolean') throw badRequest('enabled must be true or false.');

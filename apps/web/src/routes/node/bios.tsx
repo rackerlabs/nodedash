@@ -25,6 +25,7 @@ import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 const columns: Array<DataColumn<BiosSetting>> = [
   {
@@ -93,10 +94,11 @@ const columns: Array<DataColumn<BiosSetting>> = [
 ];
 
 export function NodeBiosPage() {
+  const region = useRegion();
   const { node } = useNodeContext();
   const query = useQuery({
-    queryKey: qk.bios(node.uuid),
-    queryFn: () => api.bios(node.uuid),
+    queryKey: qk.bios(region, node.uuid),
+    queryFn: () => api.bios(region, node.uuid),
     staleTime: 60_000,
   });
 

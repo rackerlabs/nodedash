@@ -142,11 +142,13 @@ serves any deployment:
 
 ### Regions and the service catalog
 
-After sign-in the user picks a region from `GET /v3/regions` (skipped when there is only one). When they
-pick a project, the BFF scopes a token to it and takes the `baremetal` endpoint for that region from the
-token's catalog, using the `IRONIC_INTERFACE` interface (`public` by default). A project with no Ironic in
-the region is refused with a message saying so. Switching region drops the selected project; the UI then
-re-selects the same project in the new region if it can.
+The region is part of the URL: the fleet view is `/nodes/<region>` and a node is `/nodes/<region>/<uuid>`, so
+a link names the Ironic it belongs to. After sign-in, a URL with no region goes to the one last used in this
+browser, or the user picks one from `GET /v3/regions` (skipped when there is only one). Every `/api` call
+for node data carries its region in the path, and the BFF takes the `baremetal` endpoint for that region from
+the scoped token's catalog, using the `IRONIC_INTERFACE` interface (`public` by default). A project with no
+Ironic in the region gets a 404 saying so. The selected project is not tied to a region, and one scoped
+token serves them all, so switching region keeps the project and mints nothing.
 
 Each region's Ironic negotiates its own microversion, so capabilities are per region.
 
@@ -207,7 +209,7 @@ it. `GRAPHICAL_CONSOLE_TYPE` only needs setting where a node exposes both a seri
 
 ## Security
 
-- The session — the unscoped Keystone token, the current project's scoped token, identity, region and
+- The session — the unscoped Keystone token, the current project's scoped token, identity and
   project — lives in one cookie, encrypted and authenticated with libsodium (`@fastify/secure-session`)
   under `SESSION_KEYS`. It is `HttpOnly`, `Secure` and `SameSite=Lax`, so page JavaScript cannot read it and
   the browser cannot alter it. Nothing sensitive is ever serialised into a response body.

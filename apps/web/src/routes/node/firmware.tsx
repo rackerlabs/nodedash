@@ -26,6 +26,7 @@ import { qk } from '@/lib/api/keys';
 import { formatTimestamp } from '@/lib/format';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 const columns: Array<DataColumn<FirmwareComponent>> = [
   {
@@ -88,10 +89,11 @@ const columns: Array<DataColumn<FirmwareComponent>> = [
 ];
 
 export function NodeFirmwarePage() {
+  const region = useRegion();
   const { node } = useNodeContext();
   const query = useQuery({
-    queryKey: qk.firmware(node.uuid),
-    queryFn: () => api.firmware(node.uuid),
+    queryKey: qk.firmware(region, node.uuid),
+    queryFn: () => api.firmware(region, node.uuid),
     staleTime: 60_000,
   });
 

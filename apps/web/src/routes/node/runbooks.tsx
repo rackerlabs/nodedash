@@ -44,15 +44,17 @@ import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 export function NodeRunbooksPage() {
+  const region = useRegion();
   const { node, row } = useNodeContext();
   const capabilities = useCapabilities();
   const [selected, setSelected] = useState<Runbook | null>(null);
 
   const query = useQuery({
-    queryKey: qk.runbooks,
-    queryFn: () => api.runbooks(),
+    queryKey: qk.runbooks(region),
+    queryFn: () => api.runbooks(region),
     staleTime: 5 * 60_000,
   });
 
@@ -205,6 +207,7 @@ function RunbookCard({
  * node name typed out when a tenant instance is on the box.
  */
 function RunRunbookDialog({ runbook, onClose }: { runbook: Runbook | null; onClose: () => void }) {
+  const region = useRegion();
   const { row } = useNodeContext();
   const invalidate = useNodeInvalidator(row.uuid);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -214,7 +217,7 @@ function RunRunbookDialog({ runbook, onClose }: { runbook: Runbook | null; onClo
   const expected = nodeDisplayName(row);
 
   const run = useMutation({
-    mutationFn: () => api.runRunbook(row.uuid, runbook!.name),
+    mutationFn: () => api.runRunbook(region, row.uuid, runbook!.name),
     onSuccess: () => {
       toast.success(`Running ${runbook?.name}`, {
         description: 'Ironic moved the node to servicing. Progress updates on this page.',

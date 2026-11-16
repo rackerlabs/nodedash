@@ -106,7 +106,6 @@ const SUPPORT_ASSIST_PHASES = { queued: 0.05, uploading: 0.88 };
 export interface PersistedAuth {
   authenticated: boolean;
   idp: string | null;
-  region?: string | null;
   projectId: string | null;
   lastProjectId: string | null;
 }
@@ -130,7 +129,8 @@ export interface MockBackend {
   logout(): void;
   getCapabilities(): CapabilitiesResponse;
   getRegions(): RegionList;
-  setRegion(region: string): Session;
+  /** Refuses a region the fixtures have no Ironic in, the way the real BFF does. */
+  assertRegion(region: string): void;
   getScopeOptions(query: { search?: string; domainId?: string; limit?: number }): ScopeOptions;
   setScope(projectId: string): Session;
   clearScope(): Session;
@@ -201,7 +201,6 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
   let session: Session = {
     authenticated: !scenario.startSignedOut,
     user: scenario.startSignedOut ? null : mockUser,
-    region: null,
     scope: null,
     lastScope: null,
     expiresAt: null,
@@ -223,7 +222,6 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     options.persistence?.save({
       authenticated: session.authenticated,
       idp: session.user?.idp ?? null,
-      region: session.region ?? null,
       projectId: session.scope?.projectId ?? null,
       lastProjectId: session.lastScope?.projectId ?? null,
     });
@@ -237,7 +235,6 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
       ...session,
       authenticated: true,
       user: { ...mockUser, idp: restored.idp ?? mockUser.idp },
-      region: scenario.regions.some((region) => region.id === restored.region) ? restored.region : null,
       scope: project ? scopeFor(project) : null,
       lastScope: lastProject ? scopeFor(lastProject) : null,
     };
@@ -249,15 +246,8 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     }
   }
 
-  function requireRegion(): void {
-    requireAuth();
-    if (!session.region) {
-      throw new MockApiError(409, 'no_region', 'Select a region first.');
-    }
-  }
-
   function requireScope(): Scope {
-    requireRegion();
+    requireAuth();
     if (!session.scope) {
       throw new MockApiError(409, 'no_scope', 'Select a domain and project first.');
     }
@@ -418,12 +408,12 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     },
 
     logout() {
-      session = { ...session, authenticated: false, user: null, region: null, scope: null, expiresAt: null };
+      session = { ...session, authenticated: false, user: null, scope: null, expiresAt: null };
       persist();
     },
 
     getCapabilities() {
-      // The real BFF asks the selected region's Ironic, so it needs a scope too.
+      // The real BFF asks the region's Ironic, so it needs a scope too.
       requireScope();
       return capabilities;
     },
@@ -433,14 +423,15 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
       return { regions: scenario.regions };
     },
 
-    setRegion(region: string) {
+    assertRegion(region: string) {
       requireAuth();
       if (!scenario.regions.some((candidate) => candidate.id === region)) {
-        throw new MockApiError(400, 'bad_request', `Keystone has no region named ${region}.`);
+        throw new MockApiError(
+          404,
+          'not_found',
+          `Project has no bare metal (Ironic) endpoint in region ${region}.`,
+        );
       }
-      session = { ...session, region, scope: null };
-      persist();
-      return session;
     },
 
     getScopeOptions({ search, domainId, limit = 500 }) {
@@ -465,7 +456,7 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     },
 
     setScope(projectId: string) {
-      requireRegion();
+      requireAuth();
       const project = projectsById.get(projectId);
       if (!project) {
         throw new MockApiError(404, 'not_found', `Project ${projectId} is not available to you.`);

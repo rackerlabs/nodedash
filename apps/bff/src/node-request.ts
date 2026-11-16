@@ -20,43 +20,44 @@ import { EXPIRY_SKEW_MS, ironicEndpointFor, type KeystoneClient, type ScopedToke
 import { requireScope } from './session.ts';
 
 /**
- * Token and Ironic endpoint for the session's current project and region. The
- * scoped token rides in the session cookie, so it is minted once per project
- * rather than on every request, and is replaced shortly before Keystone would
- * reject it.
+ * Token and Ironic endpoint for the current project in the region the request
+ * names. The scoped token rides in the session cookie, so it is minted once per
+ * project rather than on every request, and is replaced shortly before Keystone
+ * would reject it.
  */
 export async function ironicTarget(keystone: KeystoneClient, request: FastifyRequest): Promise<IronicTarget> {
   const { unscopedToken, scope, region } = requireScope(request);
 
   const current = request.session.scoped;
-  if (
-    current &&
-    current.projectId === scope.projectId &&
-    current.region === region &&
-    current.expiresAtMs - EXPIRY_SKEW_MS > Date.now()
-  ) {
-    return { token: current.token, endpoint: current.ironicEndpoint };
+  if (current && current.projectId === scope.projectId && current.expiresAtMs - EXPIRY_SKEW_MS > Date.now()) {
+    return {
+      token: current.token,
+      endpoint: ironicEndpointFor(current.ironicEndpoints, scope.projectName, region),
+    };
   }
 
   const scoped = await keystone.scopedToken(unscopedToken, scope.projectId);
   return rememberScopedToken(request, scoped, region);
 }
 
-/** Keeps a freshly minted token as the session's current one and returns its target. */
+/** Keeps a freshly minted token as the session's current one. */
+export function cacheScopedToken(request: FastifyRequest, scoped: ScopedToken): void {
+  request.session.scoped = {
+    token: scoped.token,
+    expiresAtMs: scoped.expiresAtMs,
+    projectId: scoped.projectId,
+    ironicEndpoints: scoped.ironicEndpoints,
+  };
+}
+
+/** Caches a freshly minted token and returns its target in the region a request names. */
 export function rememberScopedToken(
   request: FastifyRequest,
   scoped: ScopedToken,
   region: string,
 ): IronicTarget {
-  const endpoint = ironicEndpointFor(scoped, region);
-  request.session.scoped = {
-    token: scoped.token,
-    expiresAtMs: scoped.expiresAtMs,
-    projectId: scoped.projectId,
-    region,
-    ironicEndpoint: endpoint,
-  };
-  return { token: scoped.token, endpoint };
+  cacheScopedToken(request, scoped);
+  return { token: scoped.token, endpoint: ironicEndpointFor(scoped.ironicEndpoints, scoped.projectName, region) };
 }
 
 /**

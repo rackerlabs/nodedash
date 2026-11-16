@@ -22,7 +22,6 @@ function setup(scenarioId = 'default') {
   const scenario = { ...findScenario(scenarioId), latencyMs: 0 };
   const backend = createMockBackend({ scenario });
   backend.login('corp-sso');
-  backend.setRegion('lab-1');
   const project = backend.fixtures.projects[0]!;
   backend.setScope(project.id);
   const nodes = backend.listNodes({}).nodes;
@@ -34,23 +33,18 @@ describe('mock backend: authentication and scope', () => {
     const backend = createMockBackend({ scenario: { ...findScenario('default'), latencyMs: 0 } });
     expect(() => backend.listNodes({})).toThrowError(/Sign in/);
     backend.login('corp-sso');
-    expect(() => backend.listNodes({})).toThrowError(/Select a region/);
-    backend.setRegion('lab-1');
     expect(() => backend.listNodes({})).toThrowError(/Select a domain and project/);
   });
 
-  it('drops the selected project when the region changes, keeping it as the last one', () => {
+  it('keeps the selected project across regions and refuses one with no Ironic', () => {
     const backend = createMockBackend({ scenario: { ...findScenario('multi-region'), latencyMs: 0 } });
     backend.login('corp-sso');
     expect(backend.getRegions().regions).toHaveLength(3);
-    backend.setRegion('lab-1');
-    const project = backend.fixtures.projects[0]!;
-    backend.setScope(project.id);
+    backend.setScope(backend.fixtures.projects[0]!.id);
 
-    const session = backend.setRegion('lab-2');
-    expect(session).toMatchObject({ region: 'lab-2', scope: null });
-    expect(session.lastScope?.projectId).toBe(project.id);
-    expect(() => backend.setRegion('nowhere')).toThrowError(/no region named nowhere/);
+    expect(() => backend.assertRegion('lab-2')).not.toThrow();
+    expect(backend.getSession().scope?.projectId).toBe(backend.fixtures.projects[0]!.id);
+    expect(() => backend.assertRegion('nowhere')).toThrowError(/no bare metal \(Ironic\) endpoint in region nowhere/);
   });
 
   it('remembers the last scope after it is cleared, the way a session cookie would', () => {
@@ -106,7 +100,6 @@ describe('mock backend: power', () => {
       now: () => now,
     });
     backend.login('corp-sso');
-    backend.setRegion('lab-1');
     backend.setScope(backend.fixtures.projects[0]!.id);
     const uuid = backend.listNodes({}).nodes[0]!.uuid;
 
@@ -149,7 +142,6 @@ describe('mock backend: runbooks', () => {
       now: () => now,
     });
     backend.login('corp-sso');
-    backend.setRegion('lab-1');
     backend.setScope(backend.fixtures.projects[0]!.id);
 
     const candidate = backend
@@ -185,7 +177,6 @@ describe('mock backend: console', () => {
       consoleBasePath: '/mock-console',
     });
     backend.login('corp-sso');
-    backend.setRegion('lab-1');
     backend.setScope(backend.fixtures.projects[0]!.id);
     const uuid = backend.listNodes({}).nodes[0]!.uuid;
 
@@ -279,7 +270,6 @@ function setupWithClock(scenarioId = 'default', projectName = 'baremetal') {
   const clock = { now: Date.UTC(2026, 7, 19, 12, 0, 0) };
   const backend = createMockBackend({ scenario, now: () => clock.now });
   backend.login('corp-sso');
-  backend.setRegion('lab-1');
   const project = backend.fixtures.projects.find((candidate) => candidate.name === projectName);
   if (!project) throw new Error(`fixture set has no project named ${projectName}`);
   backend.setScope(project.id);

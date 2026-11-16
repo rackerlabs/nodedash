@@ -15,14 +15,15 @@ limitations under the License.
 */
 
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, Outlet, useLocation, useParams } from 'react-router';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Empty } from '@/components/ui/misc';
-import { useRegions, useSession, useSetRegion, useSetScope } from '@/features/auth/session';
+import { useRegions, useSession, useSetScope } from '@/features/auth/session';
+import { readLastRegion, rememberRegion } from '@/features/region/last-region';
 import { RegionChooser } from '@/features/region/region-picker';
 import { ScopePickerDialog } from '@/features/scope/scope-picker';
 import { errorMessage, isUnauthenticated } from '@/lib/api/client';
-import { nodesPath, useRegionPaths } from '@/lib/paths';
+import { nodesPath, useRegion, useRegionPaths } from '@/lib/paths';
 import { ErrorPanel, FullPageSpinner } from './status';
 
 export function RequireAuth() {
@@ -44,33 +45,21 @@ export function RequireAuth() {
 }
 
 /**
- * Each region has its own Ironic, found in the Keystone catalog, and the region in
- * the URL is the one the page is about. The session cookie still carries the region
- * the BFF calls, so this guard makes the two agree before anything node-shaped
- * renders. With a single cookie, the tab that synced last decides what the BFF sees.
+ * Each region has its own Ironic, found in the Keystone catalog. The region in the
+ * URL is the one the page is about and every API call names it, so there is nothing
+ * to sync with the server; the guard only refuses a region Keystone does not list
+ * for this user.
  */
 export function RequireRegion() {
-  const { region = '' } = useParams();
-  const session = useSession();
+  const region = useRegion();
   const regions = useRegions();
-  const setRegion = useSetRegion();
-  const requested = useRef<string | null>(null);
 
-  const current = session.data?.region ?? null;
   const list = regions.data?.regions ?? [];
   const known = list.some((candidate) => candidate.id === region);
 
   useEffect(() => {
-    if (current === region) {
-      requested.current = null;
-      return;
-    }
-    // One request per mismatch; if another tab moves the cookie away again, the
-    // session refetch lands here with the ref cleared and syncs it back.
-    if (!known || requested.current === region) return;
-    requested.current = region;
-    setRegion.mutate(region);
-  }, [current, region, known, setRegion]);
+    if (known) rememberRegion(region);
+  }, [known, region]);
 
   if (regions.isError) {
     return <ErrorPanel title="Could not list regions" error={regions.error} onRetry={() => void regions.refetch()} />;
@@ -84,36 +73,19 @@ export function RequireRegion() {
       />
     );
   }
-  if (setRegion.isError) {
-    return (
-      <ErrorPanel
-        title={`Could not select region ${region}`}
-        error={setRegion.error}
-        onRetry={() => {
-          requested.current = null;
-          setRegion.reset();
-        }}
-      />
-    );
-  }
-  if (current !== region) return <FullPageSpinner label={`Switching to ${region}…`} />;
 
   return <Outlet />;
 }
 
 /**
  * Landing for URLs without a region: `/` and the post-login default. It sends them
- * to the region the session last used, or asks when there is more than one.
+ * to the region last used in this browser, or asks when there is more than one.
  */
 export function RegionEntry() {
-  const session = useSession();
   const location = useLocation();
-  const region = session.data?.region ?? null;
-  const regions = useRegions(!region);
+  const regions = useRegions();
 
   const target = (id: string) => `${nodesPath(id)}${location.search}`;
-
-  if (region) return <Navigate to={target(region)} replace />;
 
   const list = regions.data?.regions ?? [];
   if (regions.isError) {
@@ -127,8 +99,12 @@ export function RegionEntry() {
       </ErrorPanel>
     );
   }
+
+  const last = list.find((candidate) => candidate.id === readLastRegion());
   // With one region there is nothing to choose.
-  if (list.length === 1) return <Navigate to={target(list[0]!.id)} replace />;
+  const only = list.length === 1 ? list[0] : undefined;
+  const chosen = last ?? only;
+  if (chosen) return <Navigate to={target(chosen.id)} replace />;
 
   return <RegionChooser regions={list} target={target} />;
 }

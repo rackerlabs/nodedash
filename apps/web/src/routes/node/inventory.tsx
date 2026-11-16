@@ -27,6 +27,7 @@ import { qk } from '@/lib/api/keys';
 import { formatBytes } from '@/lib/format';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 type Disk = NonNullable<NonNullable<ReturnType<typeof useInventory>['data']>['inventory']['disks']>[number];
 type Interface = NonNullable<
@@ -34,9 +35,10 @@ type Interface = NonNullable<
 >[number];
 
 function useInventory(uuid: string) {
+  const region = useRegion();
   return useQuery({
-    queryKey: qk.inventory(uuid),
-    queryFn: () => api.inventory(uuid),
+    queryKey: qk.inventory(region, uuid),
+    queryFn: () => api.inventory(region, uuid),
     staleTime: 5 * 60_000,
   });
 }

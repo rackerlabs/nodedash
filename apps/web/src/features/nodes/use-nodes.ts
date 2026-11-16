@@ -20,6 +20,7 @@ import { useCallback, useState } from 'react';
 import { useSession } from '@/features/auth/session';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
+import { useRegion } from '@/lib/paths';
 
 /** Auto-refresh interval for the fleet view, in ms. */
 const NODES_REFRESH_MS = 30_000;
@@ -29,6 +30,7 @@ const NODES_REFRESH_MS = 30_000;
  * so this reports how many nodes have arrived while the pages are still walking.
  */
 export function useNodes(options: { autoRefresh: boolean }) {
+  const region = useRegion();
   const session = useSession();
   const projectId = session.data?.scope?.projectId ?? null;
   const [loadedCount, setLoadedCount] = useState(0);
@@ -36,9 +38,9 @@ export function useNodes(options: { autoRefresh: boolean }) {
   const onProgress = useCallback((loaded: number) => setLoadedCount(loaded), []);
 
   const query = useQuery({
-    queryKey: qk.nodes(projectId),
+    queryKey: qk.nodes(region, projectId),
     enabled: Boolean(projectId),
-    queryFn: ({ signal }) => api.allNodes({ signal, onProgress }),
+    queryFn: ({ signal }) => api.allNodes(region, { signal, onProgress }),
     select: (nodes): NodeRow[] => nodes.map(toNodeRow),
     refetchInterval: options.autoRefresh ? NODES_REFRESH_MS : false,
   });
