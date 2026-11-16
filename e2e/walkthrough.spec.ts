@@ -82,6 +82,37 @@ test.describe('regions', () => {
     await expect(page.getByRole('button', { name: 'Region lab-3' })).toBeVisible();
     await expect(page.getByRole('button', { name: new RegExp(PROJECT) })).toBeVisible();
     await expect(page.getByText(/\d+ nodes/)).toBeVisible();
+    await expect(page).toHaveURL(/\/nodes\/lab-3(\?|$)/);
+  });
+
+  test('a link with a region skips the chooser and survives sign-in', async ({ page }) => {
+    await page.goto('/nodes/lab-3?scenario=multi-region');
+    await page.getByRole('button', { name: /Continue with Corp SSO/ }).click();
+
+    await expect(page.getByText('Choose a region')).toBeHidden();
+    await chooseProject(page);
+    await expect(page.getByRole('button', { name: 'Region lab-3' })).toBeVisible();
+    await expect(page).toHaveURL(/\/nodes\/lab-3(\?|$)/);
+  });
+
+  test('follows the region in the URL when it changes', async ({ page }) => {
+    await page.goto('/nodes/lab-2?scenario=multi-region');
+    await page.getByRole('button', { name: /Continue with Corp SSO/ }).click();
+    await chooseProject(page);
+    await expect(page.getByRole('button', { name: 'Region lab-2' })).toBeVisible();
+
+    await page.goto('/nodes/lab-3');
+    await expect(page.getByRole('button', { name: 'Region lab-3' })).toBeVisible();
+    await expect(page.getByText(/\d+ nodes/)).toBeVisible();
+  });
+
+  test('an unknown region offers the real ones', async ({ page }) => {
+    await page.goto('/nodes/nowhere?scenario=multi-region');
+    await page.getByRole('button', { name: /Continue with Corp SSO/ }).click();
+
+    await expect(page.getByText(/Region nowhere is not available/)).toBeVisible();
+    await page.getByRole('button', { name: /lab-2/ }).click();
+    await expect(page).toHaveURL(/\/nodes\/lab-2(\?|$)/);
   });
 });
 
@@ -180,14 +211,14 @@ test.describe('node detail', () => {
     await expect(page.getByText('Extra', { exact: true })).toBeVisible();
     await expect(page.getByText(/^asset_tag$|^Nothing in this node/).first()).toBeVisible();
 
-    const uuid = page.url().split('/nodes/')[1]!;
+    const uuid = new URL(page.url()).pathname.split('/').pop()!;
     for (const [tab, heading] of [
       ['inventory', /Network interfaces/],
       ['bios', /Settings as last read by Ironic/],
       ['firmware', /Firmware versions as last reported/],
       ['runbooks', /Runbooks are predefined step sequences/],
     ] as const) {
-      await page.goto(`/nodes/${uuid}/${tab}`);
+      await page.goto(`/nodes/lab-1/${uuid}/${tab}`);
       await expect(page.getByText(heading)).toBeVisible();
     }
   });
@@ -276,7 +307,7 @@ test.describe('deep links', () => {
       return { uuid: node.uuid, projectName: project.name };
     });
 
-    await page.goto(`/nodes/${target.uuid}`);
+    await page.goto(`/nodes/lab-1/${target.uuid}`);
     await expect(page.getByRole('button', { name: new RegExp(target.projectName) })).toBeVisible({
       timeout: 20_000,
     });
@@ -287,7 +318,7 @@ test.describe('deep links', () => {
     await signIn(page);
     await chooseProject(page);
 
-    await page.goto('/nodes/ffffffff-ffff-4fff-afff-ffffffffffff');
+    await page.goto('/nodes/lab-1/ffffffff-ffff-4fff-afff-ffffffffffff');
     await expect(page.getByText('Node not found in any of your projects')).toBeVisible({
       timeout: 20_000,
     });
@@ -330,7 +361,7 @@ test.describe('SupportAssist', () => {
     test.setTimeout(120_000);
     await signIn(page);
     await chooseProject(page);
-    await page.goto(`/nodes/${await idracNodeUuid(page)}/support-assist`);
+    await page.goto(`/nodes/lab-1/${await idracNodeUuid(page)}/support-assist`);
 
     // This node may already have finished collections, so count them: the
     // assertion has to be about the one this test starts, not any download link.
@@ -360,7 +391,7 @@ test.describe('SupportAssist', () => {
   }) => {
     await signIn(page);
     await chooseProject(page);
-    await page.goto(`/nodes/${await idracNodeUuid(page)}/support-assist`);
+    await page.goto(`/nodes/lab-1/${await idracNodeUuid(page)}/support-assist`);
 
     await page.getByRole('button', { name: 'Collect bundle' }).click();
     const dialog = page.getByRole('dialog');
@@ -391,12 +422,12 @@ test.describe('SupportAssist', () => {
       return node.uuid;
     });
 
-    await page.goto(`/nodes/${uuid}`);
+    await page.goto(`/nodes/lab-1/${uuid}`);
     await expect(page.getByRole('link', { name: 'Runbooks' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'SupportAssist' })).toHaveCount(0);
 
     // The route still explains itself, so a shared link is not a dead end.
-    await page.goto(`/nodes/${uuid}/support-assist`);
+    await page.goto(`/nodes/lab-1/${uuid}/support-assist`);
     await expect(page.getByText(/cannot collect a SupportAssist bundle/)).toBeVisible();
   });
 });
@@ -418,7 +449,7 @@ test.describe('health and logs', () => {
   test('shows the BMC rollup, sensors and the event log', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
-    await page.goto(`/nodes/${await redfishNodeUuid(page)}/health`);
+    await page.goto(`/nodes/lab-1/${await redfishNodeUuid(page)}/health`);
 
     await expect(page.getByRole('heading', { name: /Overall/ })).toBeVisible();
     // Cached BMC data has to say when it was read.
@@ -450,14 +481,14 @@ test.describe('health and logs', () => {
     });
     test.skip(uuid === null, 'fixture set has no ipmi node in this project');
 
-    await page.goto(`/nodes/${uuid}/health`);
+    await page.goto(`/nodes/lab-1/${uuid}/health`);
     await expect(page.getByText(/cannot report structured health/)).toBeVisible();
   });
 
   test('shows Ironic history newest first and filters it', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
-    await page.goto(`/nodes/${await redfishNodeUuid(page)}/logs`);
+    await page.goto(`/nodes/lab-1/${await redfishNodeUuid(page)}/logs`);
 
     await expect(page.getByText(/of \d+ events/)).toBeVisible();
 
@@ -472,7 +503,7 @@ test.describe('health and logs', () => {
   test('opens an IPA log and filters its lines', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
-    await page.goto(`/nodes/${await redfishNodeUuid(page)}/logs`);
+    await page.goto(`/nodes/lab-1/${await redfishNodeUuid(page)}/logs`);
 
     await page.getByRole('button', { name: /IPA logs/ }).click();
     await expect(page.getByText(/ironic_python_agent/).first()).toBeVisible();
