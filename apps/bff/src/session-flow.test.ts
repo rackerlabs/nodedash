@@ -39,6 +39,7 @@ const env = {
   KEYSTONE_URL: KEYSTONE,
   SESSION_KEYS: Buffer.alloc(32, 7).toString('base64'),
   IDENTITY_PROVIDERS: 'sso:openid:Corp SSO',
+  EDITABLE_EXTRA_FIELDS: 'rack,position',
   LOG_LEVEL: 'silent',
 };
 
@@ -63,6 +64,7 @@ const catalog = [
 
 let scopedMints = 0;
 let ironicCalls: Array<{ url: string; token: string | null; version: string | null }> = [];
+let ironicPatches: Array<{ path: string; contentType: string | null; body: unknown }> = [];
 
 function json(body: unknown, init: { status?: number; headers?: Record<string, string> } = {}) {
   return new Response(JSON.stringify(body), {
@@ -115,6 +117,14 @@ async function fakeFetch(input: string | URL, init: RequestInit = {}): Promise<R
       return json({}, { headers: { 'X-OpenStack-Ironic-API-Maximum-Version': '1.112' } });
     }
     if (url.pathname === '/v1/nodes') return json({ nodes: [] });
+    if (method === 'PATCH' && url.pathname.startsWith('/v1/nodes/')) {
+      const body = JSON.parse(String(init.body));
+      ironicPatches.push({ path: url.pathname, contentType: headers.get('content-type'), body });
+      const extra = Object.fromEntries(
+        body.map((op: { path: string; value: string }) => [op.path.slice('/extra/'.length), op.value]),
+      );
+      return json({ uuid: 'node-1', extra });
+    }
   }
 
   return new Response('unexpected request in test', { status: 599 });
@@ -149,7 +159,7 @@ type App = FastifyInstance;
 async function call(
   app: App,
   jar: Jar,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   body?: Record<string, unknown>,
   options: { form?: boolean } = {},
@@ -198,6 +208,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(fakeFetch));
   scopedMints = 0;
   ironicCalls = [];
+  ironicPatches = [];
 });
 
 afterEach(async () => {
@@ -407,5 +418,67 @@ describe('ironicEndpoints', () => {
 
   it('returns nothing when the catalog has no baremetal service', () => {
     expect(ironicEndpoints([catalog[1]!], 'public')).toEqual({});
+  });
+});
+
+describe('node extra fields', () => {
+  async function signedIn() {
+    const app = await server();
+    const jar = new Jar();
+    await signIn(app, jar);
+    await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
+    return { app, jar };
+  }
+
+  it('tells the browser which fields it may offer', async () => {
+    const { app, jar } = await signedIn();
+    const session = await call(app, jar, 'GET', '/api/session');
+    expect(session.json().editableExtraFields).toEqual(['rack', 'position']);
+  });
+
+  it('patches an allowed field into Ironic as a JSON Patch add, with the user token', async () => {
+    const { app, jar } = await signedIn();
+    const response = await call(app, jar, 'PATCH', '/api/nodes/region-a/node-1/extra', {
+      values: { rack: ' A12 ', position: '7' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().extra).toEqual({ rack: 'A12', position: '7' });
+    expect(ironicPatches).toEqual([
+      {
+        path: '/v1/nodes/node-1',
+        contentType: 'application/json',
+        body: [
+          { op: 'add', path: '/extra/rack', value: 'A12' },
+          { op: 'add', path: '/extra/position', value: '7' },
+        ],
+      },
+    ]);
+    expect(ironicCalls.at(-1)?.token).toBe(scopedFor('p1'));
+  });
+
+  it('refuses a field that is not configured without calling Ironic', async () => {
+    const { app, jar } = await signedIn();
+    for (const values of [{ driver: 'x' }, { rack: 'A1', owner: 'x' }, { 'rack/../driver': 'x' }, {}, 'rack']) {
+      const response = await call(app, jar, 'PATCH', '/api/nodes/region-a/node-1/extra', { values });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe('bad_request');
+    }
+    expect(ironicPatches).toEqual([]);
+  });
+
+  it('refuses a bad value, and a request without the CSRF token', async () => {
+    const { app, jar } = await signedIn();
+    const empty = await call(app, jar, 'PATCH', '/api/nodes/region-a/node-1/extra', { values: { rack: '  ' } });
+    expect(empty.statusCode).toBe(400);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/nodes/region-a/node-1/extra',
+      headers: { cookie: jar.header(), 'content-type': 'application/json' },
+      payload: JSON.stringify({ values: { rack: 'A1' } }),
+    });
+    expect(response.statusCode).toBe(403);
+    expect(ironicPatches).toEqual([]);
   });
 });
