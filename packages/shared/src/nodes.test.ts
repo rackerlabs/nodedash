@@ -61,6 +61,7 @@ describe('toNodeRow', () => {
     const row = toNodeRow(node({ provision_state: 'active' }));
     expect(row).toMatchObject({
       name: null,
+      resourceClass: null,
       provisionState: 'active',
       instanceUuid: null,
       instanceName: null,

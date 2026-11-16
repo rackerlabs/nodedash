@@ -39,6 +39,7 @@ export function resolveInstanceName(node: IronicNode): string | null {
 export interface NodeRow {
   uuid: string;
   name: string | null;
+  resourceClass: string | null;
   provisionState: string | null;
   targetProvisionState: string | null;
   powerState: string | null;
@@ -55,6 +56,7 @@ export function toNodeRow(node: IronicNode): NodeRow {
   return {
     uuid: node.uuid,
     name: node.name ?? null,
+    resourceClass: node.resource_class ?? null,
     provisionState: node.provision_state ?? null,
     targetProvisionState: node.target_provision_state ?? null,
     powerState: node.power_state ?? null,

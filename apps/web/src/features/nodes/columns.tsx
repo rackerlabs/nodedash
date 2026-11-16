@@ -58,6 +58,14 @@ export const nodeColumns = [
     meta: { width: 'minmax(14.5rem, 1fr)' } satisfies ColumnMeta,
     cell: (context) => <CopyValue value={context.getValue()} label="Copy node UUID" />,
   }),
+  helper.accessor('resourceClass', {
+    header: 'Resource class',
+    meta: { width: 'minmax(10rem, 0.8fr)' } satisfies ColumnMeta,
+    cell: (context) => {
+      const value = context.getValue();
+      return value ? <span className="truncate">{value}</span> : dash(value);
+    },
+  }),
   helper.accessor('provisionState', {
     header: 'Provision state',
     meta: { width: 'minmax(10.5rem, 0.8fr)' } satisfies ColumnMeta,
@@ -116,6 +124,7 @@ export const nodeColumns = [
 export const DEFAULT_COLUMN_LABELS: Record<string, string> = {
   name: 'Name',
   uuid: 'UUID',
+  resourceClass: 'Resource class',
   provisionState: 'Provision state',
   powerState: 'Power',
   instanceUuid: 'Instance UUID',

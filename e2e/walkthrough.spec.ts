@@ -136,6 +136,7 @@ test.describe('fleet view', () => {
     for (const header of [
       'Name',
       'UUID',
+      'Resource class',
       'Provision state',
       'Instance UUID',
       'Instance name',
@@ -198,7 +199,7 @@ test.describe('fleet view', () => {
     const ascending = await exportCsv();
     expect(ascending.filename).toMatch(/^nodes-lab-1-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(ascending.header).toBe(
-      'Name,UUID,Provision state,Power,Instance UUID,Instance name,Maintenance,Maintenance reason',
+      'Name,UUID,Resource class,Provision state,Power,Instance UUID,Instance name,Maintenance,Maintenance reason',
     );
     expect(ascending.rows).toHaveLength(matches);
     for (const row of ascending.rows) expect(row).toContain('west3');
