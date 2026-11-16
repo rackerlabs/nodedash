@@ -22,6 +22,7 @@ function row(overrides: Partial<NodeRow> = {}): NodeRow {
   return {
     uuid: 'aaaaaaaa-0000-4000-a000-000000000001',
     name: 'r01u01-north1',
+    resourceClass: null,
     provisionState: 'active',
     targetProvisionState: null,
     powerState: 'power on',
