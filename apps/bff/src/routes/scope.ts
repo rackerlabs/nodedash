@@ -20,8 +20,8 @@ import { audit } from '../audit.ts';
 import type { Config } from '../config.ts';
 import { badRequest } from '../errors.ts';
 import type { KeystoneClient } from '../keystone.ts';
-import { rememberScopedToken } from '../node-request.ts';
-import { requireAuth, requireRegion } from '../session.ts';
+import { cacheScopedToken } from '../node-request.ts';
+import { requireAuth } from '../session.ts';
 import { sessionView } from '../session-view.ts';
 
 export function registerScopeRoutes(
@@ -33,29 +33,6 @@ export function registerScopeRoutes(
     const auth = requireAuth(request);
     const regions = await keystone.listRegions(auth.unscopedToken);
     return { regions: regions.sort((a, b) => a.id.localeCompare(b.id)) };
-  });
-
-  /**
-   * Picks the region whose Ironic every node request goes to. The selected
-   * project is dropped because it may have no Ironic in the new region; the last
-   * project is kept so the UI can offer it again.
-   */
-  app.put<{ Body: { region?: string } }>('/api/region', async (request) => {
-    const auth = requireAuth(request);
-    const region = request.body?.region;
-    if (!region) throw badRequest('A region is required.');
-
-    const regions = await keystone.listRegions(auth.unscopedToken);
-    if (!regions.some((candidate) => candidate.id === region)) {
-      throw badRequest(`Keystone has no region named ${region}.`);
-    }
-
-    request.session.region = region;
-    request.session.scope = undefined;
-    request.session.scoped = undefined;
-
-    audit(request, { action: 'region.select', outcome: 'succeeded', detail: { region } });
-    return sessionView(request, config);
   });
 
   app.get<{ Querystring: { search?: string; domainId?: string } }>(
@@ -92,13 +69,15 @@ export function registerScopeRoutes(
   );
 
   app.put<{ Body: { projectId?: string } }>('/api/scope', async (request) => {
-    const auth = requireRegion(request);
+    const auth = requireAuth(request);
     const projectId = request.body?.projectId;
     if (!projectId) throw badRequest('A projectId is required.');
 
+    // Keystone refuses a project the user has no role on. Whether the project has
+    // an Ironic in the region being viewed is only known per request, so that is
+    // checked when a node call looks up the endpoint.
     const scoped = await keystone.scopedToken(auth.unscopedToken, projectId);
-    // Refuses a project with no Ironic in this region before it becomes the scope.
-    rememberScopedToken(request, scoped, auth.region);
+    cacheScopedToken(request, scoped);
     const scope = {
       domainId: scoped.domainId,
       domainName: scoped.domainName,

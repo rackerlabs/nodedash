@@ -77,8 +77,7 @@ test.describe('regions', () => {
     await page.getByRole('button', { name: 'Region lab-2' }).click();
     await page.getByRole('menuitem', { name: /lab-3/ }).click();
 
-    // The BFF drops the project on a region change; the UI re-selects the last
-    // one in the new region, the same way it restores it on a return visit.
+    // The project is not tied to a region, so it stays selected across the switch.
     await expect(page.getByRole('button', { name: 'Region lab-3' })).toBeVisible();
     await expect(page.getByRole('button', { name: new RegExp(PROJECT) })).toBeVisible();
     await expect(page.getByText(/\d+ nodes/)).toBeVisible();
@@ -103,6 +102,18 @@ test.describe('regions', () => {
 
     await page.goto('/nodes/lab-3');
     await expect(page.getByRole('button', { name: 'Region lab-3' })).toBeVisible();
+    await expect(page.getByText(/\d+ nodes/)).toBeVisible();
+  });
+
+  test('a URL with no region goes to the one used last', async ({ page }) => {
+    await page.goto('/nodes?scenario=multi-region');
+    await page.getByRole('button', { name: /Continue with Corp SSO/ }).click();
+    await page.getByRole('button', { name: /lab-2/ }).click();
+    await chooseProject(page);
+    await expect(page.getByRole('button', { name: 'Region lab-2' })).toBeVisible();
+
+    await page.goto('/nodes');
+    await expect(page).toHaveURL(/\/nodes\/lab-2(\?|$)/);
     await expect(page.getByText(/\d+ nodes/)).toBeVisible();
   });
 

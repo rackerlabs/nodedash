@@ -31,6 +31,7 @@ import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 /**
  * Two separate records, deliberately on one page: what Ironic did to this node, and
@@ -86,6 +87,7 @@ function ViewTab({
 const SEVERITY_FILTERS = ['All', 'ERROR', 'WARNING', 'INFO'] as const;
 
 function HistoryView({ uuid }: { uuid: string }) {
+  const region = useRegion();
   const capabilities = useCapabilities();
   const supported = capabilities.data?.capabilities.nodeHistory ?? true;
   const now = useNow(30_000);
@@ -93,8 +95,8 @@ function HistoryView({ uuid }: { uuid: string }) {
   const [search, setSearch] = useState('');
 
   const query = useQuery({
-    queryKey: qk.history(uuid),
-    queryFn: () => api.history(uuid),
+    queryKey: qk.history(region, uuid),
+    queryFn: () => api.history(region, uuid),
     enabled: supported,
     staleTime: 30_000,
   });
@@ -193,11 +195,12 @@ function HistoryView({ uuid }: { uuid: string }) {
 }
 
 function RamdiskView({ uuid }: { uuid: string }) {
+  const region = useRegion();
   const [selected, setSelected] = useState<string | null>(null);
 
   const list = useQuery({
-    queryKey: qk.nodeLogs(uuid),
-    queryFn: () => api.nodeLogs(uuid),
+    queryKey: qk.nodeLogs(region, uuid),
+    queryFn: () => api.nodeLogs(region, uuid),
     staleTime: 60_000,
   });
 
@@ -279,9 +282,10 @@ function LogArchiveButton({
 }
 
 function LogContent({ uuid, id }: { uuid: string; id: string }) {
+  const region = useRegion();
   const query = useQuery({
-    queryKey: qk.nodeLog(uuid, id),
-    queryFn: () => api.nodeLog(uuid, id),
+    queryKey: qk.nodeLog(region, uuid, id),
+    queryFn: () => api.nodeLog(region, uuid, id),
     staleTime: 5 * 60_000,
   });
 

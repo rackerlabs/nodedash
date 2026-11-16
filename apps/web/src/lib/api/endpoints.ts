@@ -43,6 +43,8 @@ import {
 import { IS_MOCK } from '@/lib/env';
 import { request } from './client';
 
+const enc = encodeURIComponent;
+
 export const api = {
   session: () => request('/session', { schema: SessionSchema }),
 
@@ -64,12 +66,10 @@ export const api = {
 
   logout: () => request('/auth/logout', { method: 'POST' }),
 
-  capabilities: () => request('/capabilities', { schema: CapabilitiesResponseSchema }),
+  capabilities: (region: string) =>
+    request(`/capabilities/${enc(region)}`, { schema: CapabilitiesResponseSchema }),
 
   regions: () => request('/regions', { schema: RegionListSchema }),
-
-  setRegion: (region: string) =>
-    request('/region', { method: 'PUT', body: { region }, schema: SessionSchema }),
 
   scopeOptions: (params: { search?: string; domainId?: string } = {}) =>
     request('/scope/options', {
@@ -86,7 +86,7 @@ export const api = {
    * Ironic pages node listings; the fleet view needs the whole set to sort and
    * filter locally, so walk the markers and report progress as we go.
    */
-  async allNodes(options: {
+  async allNodes(region: string, options: {
     signal?: AbortSignal;
     onProgress?: (loaded: number) => void;
     pageSize?: number;
@@ -96,7 +96,7 @@ export const api = {
     const nodes: IronicNode[] = [];
     let marker: string | undefined;
     for (let page = 0; page < maxPages; page += 1) {
-      const result = await request('/nodes', {
+      const result = await request(`/nodes/${enc(region)}`, {
         schema: NodeListSchema,
         signal,
         query: { limit: pageSize, marker },
@@ -109,63 +109,69 @@ export const api = {
     return nodes;
   },
 
-  node: (uuid: string, signal?: AbortSignal) =>
-    request(`/nodes/${uuid}`, { schema: NodeSchema, signal }),
+  node: (region: string, uuid: string, signal?: AbortSignal) =>
+    request(`/nodes/${enc(region)}/${uuid}`, { schema: NodeSchema, signal }),
 
-  locateNode: (uuid: string, signal?: AbortSignal) =>
-    request(`/nodes/${uuid}/locate`, { method: 'POST', schema: LocateResultSchema, signal }),
+  locateNode: (region: string, uuid: string, signal?: AbortSignal) =>
+    request(`/nodes/${enc(region)}/${uuid}/locate`, { method: 'POST', schema: LocateResultSchema, signal }),
 
-  setMaintenance: (uuid: string, reason: string) =>
-    request(`/nodes/${uuid}/maintenance`, { method: 'PUT', body: { reason }, schema: NodeSchema }),
+  setMaintenance: (region: string, uuid: string, reason: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/maintenance`, { method: 'PUT', body: { reason }, schema: NodeSchema }),
 
-  clearMaintenance: (uuid: string) =>
-    request(`/nodes/${uuid}/maintenance`, { method: 'DELETE', schema: NodeSchema }),
+  clearMaintenance: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/maintenance`, { method: 'DELETE', schema: NodeSchema }),
 
-  setPower: (uuid: string, target: PowerTarget) =>
-    request(`/nodes/${uuid}/power`, { method: 'PUT', body: { target } }),
+  setPower: (region: string, uuid: string, target: PowerTarget) =>
+    request(`/nodes/${enc(region)}/${uuid}/power`, { method: 'PUT', body: { target } }),
 
-  inventory: (uuid: string) => request(`/nodes/${uuid}/inventory`, { schema: NodeInventorySchema }),
+  inventory: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/inventory`, { schema: NodeInventorySchema }),
 
-  bios: (uuid: string) => request(`/nodes/${uuid}/bios`, { schema: BiosSettingsListSchema }),
+  bios: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/bios`, { schema: BiosSettingsListSchema }),
 
-  firmware: (uuid: string) => request(`/nodes/${uuid}/firmware`, { schema: FirmwareListSchema }),
+  firmware: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/firmware`, { schema: FirmwareListSchema }),
 
-  runbooks: () => request('/runbooks', { schema: RunbookListSchema }),
+  runbooks: (region: string) => request(`/runbooks/${enc(region)}`, { schema: RunbookListSchema }),
 
-  runRunbook: (uuid: string, runbook: string) =>
-    request(`/nodes/${uuid}/service`, { method: 'PUT', body: { runbook } }),
+  runRunbook: (region: string, uuid: string, runbook: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/service`, { method: 'PUT', body: { runbook } }),
 
-  history: (uuid: string, limit = 200) =>
-    request(`/nodes/${uuid}/history`, { schema: NodeHistoryListSchema, query: { limit } }),
+  history: (region: string, uuid: string, limit = 200) =>
+    request(`/nodes/${enc(region)}/${uuid}/history`, { schema: NodeHistoryListSchema, query: { limit } }),
 
-  nodeLogs: (uuid: string) => request(`/nodes/${uuid}/logs`, { schema: NodeLogArchiveListSchema }),
+  nodeLogs: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/logs`, { schema: NodeLogArchiveListSchema }),
 
-  nodeLog: (uuid: string, id: string) =>
-    request(`/nodes/${uuid}/logs/${id}`, { schema: NodeLogContentSchema }),
+  nodeLog: (region: string, uuid: string, id: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/logs/${id}`, { schema: NodeLogContentSchema }),
 
-  health: (uuid: string) => request(`/nodes/${uuid}/health`, { schema: NodeHealthSchema }),
+  health: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/health`, { schema: NodeHealthSchema }),
 
-  logServices: (uuid: string) =>
-    request(`/nodes/${uuid}/log-services`, { schema: LogServiceListSchema }),
+  logServices: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/log-services`, { schema: LogServiceListSchema }),
 
   logEntries: (
+    region: string,
     uuid: string,
     serviceId: string,
     params: { limit?: number; marker?: string; severity?: string } = {},
   ) =>
-    request(`/nodes/${uuid}/log-services/${serviceId}/entries`, {
+    request(`/nodes/${enc(region)}/${uuid}/log-services/${serviceId}/entries`, {
       schema: LogEntryListSchema,
       query: { limit: params.limit, marker: params.marker, severity: params.severity },
     }),
 
-  vendorPassthruMethods: (uuid: string) =>
-    request(`/nodes/${uuid}/vendor-passthru/methods`, { schema: VendorPassthruMethodsSchema }),
+  vendorPassthruMethods: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/vendor-passthru/methods`, { schema: VendorPassthruMethodsSchema }),
 
-  supportAssist: (uuid: string) =>
-    request(`/nodes/${uuid}/support-assist`, { schema: SupportAssistCollectionListSchema }),
+  supportAssist: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/support-assist`, { schema: SupportAssistCollectionListSchema }),
 
-  startSupportAssist: (uuid: string, body: SupportAssistStartRequest) =>
-    request(`/nodes/${uuid}/support-assist`, {
+  startSupportAssist: (region: string, uuid: string, body: SupportAssistStartRequest) =>
+    request(`/nodes/${enc(region)}/${uuid}/support-assist`, {
       method: 'POST',
       body,
       schema: SupportAssistCollectionSchema,
@@ -175,11 +181,12 @@ export const api = {
    * A plain URL rather than a fetch: the bundle is large and the server answers
    * with a redirect to storage, so the browser should own the download.
    */
-  supportAssistDownloadUrl: (uuid: string, id: string) =>
-    `/api/nodes/${encodeURIComponent(uuid)}/support-assist/${encodeURIComponent(id)}/download`,
+  supportAssistDownloadUrl: (region: string, uuid: string, id: string) =>
+    `/api/nodes/${enc(region)}/${encodeURIComponent(uuid)}/support-assist/${encodeURIComponent(id)}/download`,
 
-  console: (uuid: string) => request(`/nodes/${uuid}/console`, { schema: NodeConsoleSchema }),
+  console: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/console`, { schema: NodeConsoleSchema }),
 
-  setConsole: (uuid: string, enabled: boolean) =>
-    request(`/nodes/${uuid}/console`, { method: 'PUT', body: { enabled } }),
+  setConsole: (region: string, uuid: string, enabled: boolean) =>
+    request(`/nodes/${enc(region)}/${uuid}/console`, { method: 'PUT', body: { enabled } }),
 };

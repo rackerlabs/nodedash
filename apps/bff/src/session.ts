@@ -17,19 +17,21 @@ limitations under the License.
 import type { Session } from '@fastify/secure-session';
 import type { Scope } from '@nodedash/shared';
 import type { FastifyRequest } from 'fastify';
-import { HttpError, noScope, unauthenticated } from './errors.ts';
+import { badRequest, noScope, unauthenticated } from './errors.ts';
 import type { KeystoneIdentity } from './keystone.ts';
 
 /**
- * The scoped token for the selected project and region, kept so that every node
- * request does not have to mint a new one from Keystone.
+ * The scoped token for the selected project, kept so that every node request does
+ * not have to mint a new one from Keystone. A token is good in every region, so it
+ * carries the project's Ironic endpoints for all of them and each request picks
+ * the one for its own region.
  */
 export interface CurrentScopedToken {
   token: string;
   expiresAtMs: number;
   projectId: string;
-  region: string;
-  ironicEndpoint: string;
+  /** Ironic endpoint URL by region id, from the token's service catalog. */
+  ironicEndpoints: Record<string, string>;
 }
 
 declare module '@fastify/secure-session' {
@@ -43,7 +45,6 @@ declare module '@fastify/secure-session' {
     /** Unscoped Keystone token from WebSSO. */
     unscopedToken: string;
     identity: KeystoneIdentity;
-    region: string;
     scope: Scope;
     /** Remembered so deep links and a return visit can skip the project picker. */
     lastScope: Scope;
@@ -92,10 +93,17 @@ export function requireAuth(request: FastifyRequest): AuthenticatedSession {
   return { unscopedToken, identity };
 }
 
+/**
+ * The region comes from the request's `:region` route parameter rather than the
+ * session, so each request names the Ironic it is for and two tabs on different
+ * regions cannot disturb each other. It is not checked against Keystone's region
+ * list: a region with no Ironic in the project's catalog fails with a 404 when the
+ * endpoint is looked up.
+ */
 export function requireRegion(request: FastifyRequest): AuthenticatedSession & { region: string } {
   const auth = requireAuth(request);
-  const region = request.session.region;
-  if (!region) throw new HttpError(409, 'no_region', 'Select a region before requesting node data.');
+  const { region } = request.params as { region?: string };
+  if (!region) throw badRequest('A region is required.');
   return { ...auth, region };
 }
 

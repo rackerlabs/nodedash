@@ -30,6 +30,7 @@ import type { KeystoneClient } from '../keystone.ts';
 import { ironicTarget, nodePath } from '../node-request.ts';
 
 interface NodeParams {
+  region: string;
   uuid: string;
 }
 
@@ -64,13 +65,13 @@ export function registerSupportAssistRoutes(
    * Vendor passthru is driver-specific, so whether a node can do this at all is a
    * property of the node, not of the API version. The UI gates the tab on this.
    */
-  app.get<{ Params: NodeParams }>('/api/nodes/:uuid/vendor-passthru/methods', async (request) => {
+  app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/vendor-passthru/methods', async (request) => {
     const target = await ironicTarget(keystone, request);
     return methodsFor(target, request.params.uuid);
   });
 
   app.get<{ Params: NodeParams }>(
-    '/api/nodes/:uuid/support-assist',
+    '/api/nodes/:region/:uuid/support-assist',
     async (request): Promise<SupportAssistCollectionList> => {
       const target = await ironicTarget(keystone, request);
       const methods = await methodsFor(target, request.params.uuid);
@@ -85,7 +86,7 @@ export function registerSupportAssistRoutes(
     },
   );
 
-  app.post<{ Params: NodeParams }>('/api/nodes/:uuid/support-assist', async (request, reply) => {
+  app.post<{ Params: NodeParams }>('/api/nodes/:region/:uuid/support-assist', async (request, reply) => {
     const parsed = SupportAssistStartRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       throw badRequest('Choose at least one category of data to collect.');
@@ -134,7 +135,7 @@ export function registerSupportAssistRoutes(
    * and the download is audited.
    */
   app.get<{ Params: CollectionParams }>(
-    '/api/nodes/:uuid/support-assist/:id/download',
+    '/api/nodes/:region/:uuid/support-assist/:id/download',
     async (request, reply) => {
       const target = await ironicTarget(keystone, request);
       const minted = await ironic.json<{ url?: string }>(

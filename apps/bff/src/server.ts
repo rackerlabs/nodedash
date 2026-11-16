@@ -119,6 +119,12 @@ export async function buildServer() {
     if (request.url.startsWith('/api/')) verifyCsrf(request);
   });
 
+  // Every /api response is for one user, and the same path can differ between
+  // users, so nothing may be served from a shared or stale cache.
+  app.addHook('onSend', async (request, reply) => {
+    if (request.url.startsWith('/api/')) reply.header('Cache-Control', 'private, no-store');
+  });
+
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof HttpError) {
       if (error.status >= 500) request.log.error({ err: error }, 'upstream failure');

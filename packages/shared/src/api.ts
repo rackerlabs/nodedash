@@ -74,8 +74,6 @@ export const DEFAULT_BRANDING: Branding = {
 export const SessionSchema = z.object({
   authenticated: z.boolean(),
   user: SessionUserSchema.nullish(),
-  /** Region whose Ironic endpoint every node request goes to. Chosen after sign-in. */
-  region: z.string().nullish(),
   scope: ScopeSchema.nullish(),
   /** Most recent scope from a previous visit, used to skip the picker. */
   lastScope: ScopeSchema.nullish(),
@@ -128,7 +126,6 @@ export type ApiError = z.infer<typeof ApiErrorSchema>;
 
 export type ApiErrorCode =
   | 'unauthenticated'
-  | 'no_region'
   | 'no_scope'
   | 'forbidden'
   | 'not_found'

@@ -23,8 +23,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useRegions } from '@/features/auth/session';
@@ -102,10 +100,6 @@ export function RegionMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Switching region clears the selected project.
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
         {list.map((region) => (
           <DropdownMenuItem
             key={region.id}

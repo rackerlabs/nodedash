@@ -49,6 +49,7 @@ import { formatBytes, formatTimestamp, relativeTime, timeUntil } from '@/lib/for
 import { useNow } from '@/lib/use-now';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 export function NodeSupportAssistPage() {
   const { node, row } = useNodeContext();
@@ -204,6 +205,7 @@ function CollectionRow({
   collection: SupportAssistCollection;
   nodeUuid: string;
 }) {
+  const region = useRegion();
   const now = useNow(30_000);
   const started = new Date(collection.started_at).getTime();
   const finished = collection.finished_at ? new Date(collection.finished_at).getTime() : null;
@@ -252,7 +254,7 @@ function CollectionRow({
       {isSupportAssistDownloadable(collection) ? (
         <Button variant="outline" size="sm" className="gap-2" asChild>
           {/* A real link: the server redirects to storage and the browser downloads it. */}
-          <a href={api.supportAssistDownloadUrl(nodeUuid, collection.id)}>
+          <a href={api.supportAssistDownloadUrl(region, nodeUuid, collection.id)}>
             <Download className="size-4" />
             Download
           </a>

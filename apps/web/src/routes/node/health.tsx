@@ -39,16 +39,18 @@ import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
+import { useRegion } from '@/lib/paths';
 
 /** Health is read from the BMC and cached, so it is polled gently. */
 const HEALTH_POLL_MS = 60_000;
 
 export function NodeHealthPage() {
+  const region = useRegion();
   const { node, row } = useNodeContext();
 
   const query = useQuery({
-    queryKey: qk.health(row.uuid),
-    queryFn: () => api.health(row.uuid),
+    queryKey: qk.health(region, row.uuid),
+    queryFn: () => api.health(region, row.uuid),
     refetchInterval: HEALTH_POLL_MS,
     staleTime: 30_000,
   });
@@ -263,21 +265,22 @@ const SEVERITY_OPTIONS = ['All', 'Critical', 'Warning', 'OK'] as const;
  * purpose: clearing a SEL destroys the hardware's record of what went wrong.
  */
 function EventLogs({ uuid }: { uuid: string }) {
+  const region = useRegion();
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [severity, setSeverity] = useState<(typeof SEVERITY_OPTIONS)[number]>('All');
   const now = useNow(30_000);
 
   const services = useQuery({
-    queryKey: qk.logServices(uuid),
-    queryFn: () => api.logServices(uuid),
+    queryKey: qk.logServices(region, uuid),
+    queryFn: () => api.logServices(region, uuid),
     staleTime: 5 * 60_000,
   });
 
   const active = serviceId ?? services.data?.log_services[0]?.id ?? null;
 
   const entries = useQuery({
-    queryKey: qk.logEntries(uuid, active ?? '', severity === 'All' ? null : severity),
-    queryFn: () => api.logEntries(uuid, active!, { severity: severity === 'All' ? undefined : severity }),
+    queryKey: qk.logEntries(region, uuid, active ?? '', severity === 'All' ? null : severity),
+    queryFn: () => api.logEntries(region, uuid, active!, { severity: severity === 'All' ? undefined : severity }),
     enabled: active !== null,
     staleTime: 60_000,
   });

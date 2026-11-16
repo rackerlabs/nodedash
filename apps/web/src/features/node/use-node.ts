@@ -22,6 +22,7 @@ import { rememberScope } from '@/features/scope/recents';
 import { isNotFound } from '@/lib/api/client';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
+import { useRegion } from '@/lib/paths';
 
 /** Poll interval while Ironic is mid-operation on a node. */
 const ACTIVE_POLL_MS = 3_000;
@@ -47,6 +48,7 @@ export type ResolutionPhase = 'resolving' | 'ready' | 'error' | 'unresolvable';
  * reached when the cheap paths miss.
  */
 export function useResolvedNode(uuid: string) {
+  const region = useRegion();
   const session = useSession();
   const setScope = useSetScope();
   const queryClient = useQueryClient();
@@ -57,7 +59,7 @@ export function useResolvedNode(uuid: string) {
   const lastScope = session.data?.lastScope ?? null;
 
   const locate = useMutation({
-    mutationFn: () => api.locateNode(uuid),
+    mutationFn: () => api.locateNode(region, uuid),
     onSuccess: (result) => {
       if (!result.found || !result.scope) {
         setUnresolvable(true);
@@ -68,16 +70,16 @@ export function useResolvedNode(uuid: string) {
         previous ? { ...previous, scope: found, lastScope: found } : previous,
       );
       rememberScope(found);
-      void queryClient.invalidateQueries({ queryKey: qk.node(uuid) });
+      void queryClient.invalidateQueries({ queryKey: qk.node(region, uuid) });
       void queryClient.invalidateQueries({ queryKey: ['nodes'] });
     },
     onError: () => setUnresolvable(true),
   });
 
   const node = useQuery({
-    queryKey: qk.node(uuid),
+    queryKey: qk.node(region, uuid),
     enabled: Boolean(scope),
-    queryFn: ({ signal }) => api.node(uuid, signal),
+    queryFn: ({ signal }) => api.node(region, uuid, signal),
     refetchInterval: (query) => (nodeIsSettling(query.state.data) ? ACTIVE_POLL_MS : false),
     // Operators leave a long service run in a background tab and come back to it,
     // so keep polling while the node is mid-operation even when hidden.
@@ -126,9 +128,10 @@ export function useResolvedNode(uuid: string) {
 
 /** Invalidate everything that can change when a node is acted on. */
 export function useNodeInvalidator(uuid: string) {
+  const region = useRegion();
   const queryClient = useQueryClient();
   return () => {
-    void queryClient.invalidateQueries({ queryKey: qk.node(uuid) });
+    void queryClient.invalidateQueries({ queryKey: qk.node(region, uuid) });
     void queryClient.invalidateQueries({ queryKey: ['nodes'] });
   };
 }

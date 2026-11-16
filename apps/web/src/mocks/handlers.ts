@@ -65,6 +65,13 @@ window.__mockBackend = backend;
 /** A handler may return a ready-made Response (a file download) instead of JSON. */
 type Handler = () => unknown;
 
+function failure(error: unknown) {
+  if (error instanceof MockApiError) {
+    return HttpResponse.json({ error: { code: error.code, message: error.message } }, { status: error.status });
+  }
+  return HttpResponse.json({ error: { code: 'upstream_error', message: String(error) } }, { status: 500 });
+}
+
 async function respond(handler: Handler, options: { read?: boolean } = {}) {
   await delay(backend.latencyMs());
   if (options.read && backend.shouldFailRead()) {
@@ -79,17 +86,21 @@ async function respond(handler: Handler, options: { read?: boolean } = {}) {
     if (payload instanceof Response) return payload;
     return payload === undefined ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(payload);
   } catch (error) {
-    if (error instanceof MockApiError) {
-      return HttpResponse.json(
-        { error: { code: error.code, message: error.message } },
-        { status: error.status },
-      );
-    }
-    return HttpResponse.json(
-      { error: { code: 'upstream_error', message: String(error) } },
-      { status: 500 },
-    );
+    return failure(error);
   }
+}
+
+/**
+ * Every region-scoped route names its region in the path. Resolving to nothing
+ * hands the request on to the real handler below, so only a bad region stops here.
+ */
+function checkRegion({ params }: { params: Record<string, string | readonly string[] | undefined> }) {
+  try {
+    backend.assertRegion(String(params.region));
+  } catch (error) {
+    return failure(error);
+  }
+  return undefined;
 }
 
 async function body<T>(request: Request): Promise<T> {
@@ -101,6 +112,11 @@ async function body<T>(request: Request): Promise<T> {
 }
 
 export const handlers = [
+  http.all('/api/capabilities/:region', checkRegion),
+  http.all('/api/runbooks/:region', checkRegion),
+  http.all('/api/nodes/:region', checkRegion),
+  http.all('/api/nodes/:region/*', checkRegion),
+
   http.get('/api/session', () => respond(() => backend.getSession(), { read: true })),
   http.post('/api/auth/dev-login', async ({ request }) => {
     const { idp } = await body<{ idp?: string }>(request);
@@ -113,14 +129,9 @@ export const handlers = [
     }),
   ),
 
-  http.get('/api/capabilities', () => respond(() => backend.getCapabilities(), { read: true })),
+  http.get('/api/capabilities/:region', () => respond(() => backend.getCapabilities(), { read: true })),
 
   http.get('/api/regions', () => respond(() => backend.getRegions(), { read: true })),
-  http.put('/api/region', async ({ request }) => {
-    const { region } = await body<{ region: string }>(request);
-    return respond(() => backend.setRegion(region));
-  }),
-
   http.get('/api/scope/options', ({ request }) => {
     const url = new URL(request.url);
     return respond(
@@ -138,7 +149,7 @@ export const handlers = [
   }),
   http.delete('/api/scope', () => respond(() => backend.clearScope())),
 
-  http.get('/api/nodes', ({ request }) => {
+  http.get('/api/nodes/:region', ({ request }) => {
     const url = new URL(request.url);
     return respond(
       () =>
@@ -149,21 +160,21 @@ export const handlers = [
       { read: true },
     );
   }),
-  http.get('/api/nodes/:uuid', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid', ({ params }) =>
     respond(() => backend.getNode(String(params.uuid)), { read: true }),
   ),
-  http.post('/api/nodes/:uuid/locate', ({ params }) =>
+  http.post('/api/nodes/:region/:uuid/locate', ({ params }) =>
     respond(() => backend.locateNode(String(params.uuid))),
   ),
 
-  http.put('/api/nodes/:uuid/maintenance', async ({ params, request }) => {
+  http.put('/api/nodes/:region/:uuid/maintenance', async ({ params, request }) => {
     const { reason } = await body<{ reason: string }>(request);
     return respond(() => backend.setMaintenance(String(params.uuid), reason ?? ''));
   }),
-  http.delete('/api/nodes/:uuid/maintenance', ({ params }) =>
+  http.delete('/api/nodes/:region/:uuid/maintenance', ({ params }) =>
     respond(() => backend.clearMaintenance(String(params.uuid))),
   ),
-  http.put('/api/nodes/:uuid/power', async ({ params, request }) => {
+  http.put('/api/nodes/:region/:uuid/power', async ({ params, request }) => {
     const { target } = await body<{ target: never }>(request);
     return respond(() => {
       backend.setPower(String(params.uuid), target);
@@ -171,18 +182,18 @@ export const handlers = [
     });
   }),
 
-  http.get('/api/nodes/:uuid/inventory', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/inventory', ({ params }) =>
     respond(() => backend.getInventory(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/bios', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/bios', ({ params }) =>
     respond(() => backend.getBios(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/firmware', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/firmware', ({ params }) =>
     respond(() => backend.getFirmware(String(params.uuid)), { read: true }),
   ),
 
-  http.get('/api/runbooks', () => respond(() => backend.listRunbooks(), { read: true })),
-  http.put('/api/nodes/:uuid/service', async ({ params, request }) => {
+  http.get('/api/runbooks/:region', () => respond(() => backend.listRunbooks(), { read: true })),
+  http.put('/api/nodes/:region/:uuid/service', async ({ params, request }) => {
     const { runbook } = await body<{ runbook: string }>(request);
     return respond(() => {
       backend.runRunbook(String(params.uuid), runbook);
@@ -190,7 +201,7 @@ export const handlers = [
     });
   }),
 
-  http.get('/api/nodes/:uuid/history', ({ params, request }) => {
+  http.get('/api/nodes/:region/:uuid/history', ({ params, request }) => {
     const url = new URL(request.url);
     return respond(
       () =>
@@ -200,19 +211,19 @@ export const handlers = [
       { read: true },
     );
   }),
-  http.get('/api/nodes/:uuid/logs', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/logs', ({ params }) =>
     respond(() => backend.listNodeLogs(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/logs/:id', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/logs/:id', ({ params }) =>
     respond(() => backend.getNodeLog(String(params.uuid), String(params.id)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/health', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/health', ({ params }) =>
     respond(() => backend.getHealth(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/log-services', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/log-services', ({ params }) =>
     respond(() => backend.listLogServices(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/log-services/:serviceId/entries', ({ params, request }) => {
+  http.get('/api/nodes/:region/:uuid/log-services/:serviceId/entries', ({ params, request }) => {
     const url = new URL(request.url);
     return respond(
       () =>
@@ -225,13 +236,13 @@ export const handlers = [
     );
   }),
 
-  http.get('/api/nodes/:uuid/vendor-passthru/methods', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/vendor-passthru/methods', ({ params }) =>
     respond(() => backend.vendorPassthruMethods(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:uuid/support-assist', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/support-assist', ({ params }) =>
     respond(() => backend.listSupportAssist(String(params.uuid)), { read: true }),
   ),
-  http.post('/api/nodes/:uuid/support-assist', async ({ params, request }) => {
+  http.post('/api/nodes/:region/:uuid/support-assist', async ({ params, request }) => {
     const payload = await body<{ data_selectors?: never[]; filter_pii?: boolean }>(request);
     return respond(() =>
       backend.startSupportAssist(String(params.uuid), {
@@ -245,7 +256,7 @@ export const handlers = [
    * so it serves the placeholder bundle directly — either way the browser follows
    * one URL and gets a file, which is what the UI depends on.
    */
-  http.get('/api/nodes/:uuid/support-assist/:id/download', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/support-assist/:id/download', ({ params }) =>
     respond(() => {
       const file = backend.downloadSupportAssist(String(params.uuid), String(params.id));
       return new HttpResponse(file.body, {
@@ -257,10 +268,10 @@ export const handlers = [
     }, { read: true }),
   ),
 
-  http.get('/api/nodes/:uuid/console', ({ params }) =>
+  http.get('/api/nodes/:region/:uuid/console', ({ params }) =>
     respond(() => backend.getConsole(String(params.uuid)), { read: true }),
   ),
-  http.put('/api/nodes/:uuid/console', async ({ params, request }) => {
+  http.put('/api/nodes/:region/:uuid/console', async ({ params, request }) => {
     const { enabled } = await body<{ enabled: boolean }>(request);
     return respond(() => {
       backend.setConsole(String(params.uuid), Boolean(enabled));

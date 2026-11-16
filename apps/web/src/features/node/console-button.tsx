@@ -34,6 +34,7 @@ import { CAPABILITY_MICROVERSIONS } from '@nodedash/shared';
 import { errorMessage } from '@/lib/api/client';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
+import { useRegion } from '@/lib/paths';
 
 /** How often to check whether the console has finished coming up. */
 const CONSOLE_POLL_MS = 1_500;
@@ -44,19 +45,20 @@ const CONSOLE_POLL_MS = 1_500;
  * the window.open call happens inside a user gesture and survives popup blockers.
  */
 export function ConsoleButton({ node }: { node: NodeRow }) {
+  const region = useRegion();
   const capabilities = useCapabilities();
   const supported = capabilities.data?.capabilities.graphicalConsole ?? false;
 
   const consoleState = useQuery({
-    queryKey: qk.console(node.uuid),
-    queryFn: () => api.console(node.uuid),
+    queryKey: qk.console(region, node.uuid),
+    queryFn: () => api.console(region, node.uuid),
     enabled: supported,
     refetchInterval: (query) => (query.state.data?.console_enabled ? false : CONSOLE_POLL_MS),
     refetchIntervalInBackground: true,
   });
 
   const toggle = useMutation({
-    mutationFn: (enabled: boolean) => api.setConsole(node.uuid, enabled),
+    mutationFn: (enabled: boolean) => api.setConsole(region, node.uuid, enabled),
     onSuccess: (_result, enabled) => {
       if (enabled) toast.info('Starting graphical console…');
       else toast.success('Console disabled');

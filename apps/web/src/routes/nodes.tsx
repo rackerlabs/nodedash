@@ -49,6 +49,7 @@ import { formatCount, relativeTime } from '@/lib/format';
 import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import { ErrorPanel } from './status';
+import { useRegion } from '@/lib/paths';
 
 const MAINTENANCE_LABELS: Record<MaintenanceFilter, string> = {
   all: 'All nodes',
@@ -58,6 +59,7 @@ const MAINTENANCE_LABELS: Record<MaintenanceFilter, string> = {
 
 export function NodesPage() {
   const session = useSession();
+  const region = useRegion();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const { query, loadedCount } = useNodes({ autoRefresh });
   const [filters, setFilters] = useState<NodeFilters>(EMPTY_FILTERS);
@@ -189,7 +191,7 @@ export function NodesPage() {
           disabled={filtered.length === 0}
           onClick={() =>
             downloadCsv(
-              csvFilename(session.data?.region),
+              csvFilename(region),
               nodesToCsv(sortedRowsRef.current?.() ?? filtered, DEFAULT_COLUMN_LABELS),
             )
           }

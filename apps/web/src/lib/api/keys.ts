@@ -18,24 +18,24 @@ limitations under the License.
 export const qk = {
   session: ['session'] as const,
   /** Per region and project: each region's Ironic negotiates its own microversion. */
-  capabilities: (region: string | null, projectId: string | null) =>
+  capabilities: (region: string, projectId: string | null) =>
     ['capabilities', region, projectId] as const,
   regions: ['regions'] as const,
   scopeOptions: (search: string, domainId: string | null) => ['scope-options', search, domainId] as const,
-  nodes: (projectId: string | null) => ['nodes', projectId] as const,
-  node: (uuid: string) => ['node', uuid] as const,
-  inventory: (uuid: string) => ['node', uuid, 'inventory'] as const,
-  bios: (uuid: string) => ['node', uuid, 'bios'] as const,
-  firmware: (uuid: string) => ['node', uuid, 'firmware'] as const,
-  console: (uuid: string) => ['node', uuid, 'console'] as const,
-  vendorPassthru: (uuid: string) => ['node', uuid, 'vendor-passthru'] as const,
-  history: (uuid: string) => ['node', uuid, 'history'] as const,
-  nodeLogs: (uuid: string) => ['node', uuid, 'logs'] as const,
-  nodeLog: (uuid: string, id: string) => ['node', uuid, 'logs', id] as const,
-  health: (uuid: string) => ['node', uuid, 'health'] as const,
-  logServices: (uuid: string) => ['node', uuid, 'log-services'] as const,
-  logEntries: (uuid: string, serviceId: string, severity: string | null) =>
-    ['node', uuid, 'log-services', serviceId, severity] as const,
-  supportAssist: (uuid: string) => ['node', uuid, 'support-assist'] as const,
-  runbooks: ['runbooks'] as const,
+  nodes: (region: string, projectId: string | null) => ['nodes', region, projectId] as const,
+  node: (region: string, uuid: string) => ['node', region, uuid] as const,
+  inventory: (region: string, uuid: string) => ['node', region, uuid, 'inventory'] as const,
+  bios: (region: string, uuid: string) => ['node', region, uuid, 'bios'] as const,
+  firmware: (region: string, uuid: string) => ['node', region, uuid, 'firmware'] as const,
+  console: (region: string, uuid: string) => ['node', region, uuid, 'console'] as const,
+  vendorPassthru: (region: string, uuid: string) => ['node', region, uuid, 'vendor-passthru'] as const,
+  history: (region: string, uuid: string) => ['node', region, uuid, 'history'] as const,
+  nodeLogs: (region: string, uuid: string) => ['node', region, uuid, 'logs'] as const,
+  nodeLog: (region: string, uuid: string, id: string) => ['node', region, uuid, 'logs', id] as const,
+  health: (region: string, uuid: string) => ['node', region, uuid, 'health'] as const,
+  logServices: (region: string, uuid: string) => ['node', region, uuid, 'log-services'] as const,
+  logEntries: (region: string, uuid: string, serviceId: string, severity: string | null) =>
+    ['node', region, uuid, 'log-services', serviceId, severity] as const,
+  supportAssist: (region: string, uuid: string) => ['node', region, uuid, 'support-assist'] as const,
+  runbooks: (region: string) => ['runbooks', region] as const,
 };

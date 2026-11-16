@@ -226,7 +226,6 @@ describe('encrypted session cookie', () => {
     const session = await call(app, jar, 'GET', '/api/session');
     expect(session.json()).toMatchObject({
       authenticated: true,
-      region: null,
       scope: null,
       branding: { name: 'nodedash' },
     });
@@ -262,7 +261,7 @@ describe('encrypted session cookie', () => {
     expect(scopedMints).toBe(1);
   });
 
-  it('takes Ironic from the catalog of the selected region and reuses the scoped token', async () => {
+  it('takes Ironic from the catalog of the region in the URL and reuses the scoped token', async () => {
     const app = await server();
     const jar = new Jar();
     await signIn(app, jar);
@@ -270,11 +269,10 @@ describe('encrypted session cookie', () => {
     const regions = await call(app, jar, 'GET', '/api/regions');
     expect(regions.json().regions.map((region: { id: string }) => region.id)).toEqual(['region-a', 'region-b']);
 
-    expect((await call(app, jar, 'PUT', '/api/region', { region: 'region-a' })).json().region).toBe('region-a');
     expect((await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' })).statusCode).toBe(200);
 
-    expect((await call(app, jar, 'GET', '/api/nodes')).statusCode).toBe(200);
-    expect((await call(app, jar, 'GET', '/api/nodes')).statusCode).toBe(200);
+    expect((await call(app, jar, 'GET', '/api/nodes/region-a')).statusCode).toBe(200);
+    expect((await call(app, jar, 'GET', '/api/nodes/region-a')).statusCode).toBe(200);
 
     const nodeCalls = ironicCalls.filter((entry) => entry.url.includes('/v1/nodes'));
     expect(nodeCalls).toHaveLength(2);
@@ -286,34 +284,56 @@ describe('encrypted session cookie', () => {
     expect(scopedMints).toBe(1);
   });
 
-  it('drops the selected project on a region change and talks to the new region', async () => {
+  it('serves each request from the region it names, with the same project and token', async () => {
     const app = await server();
     const jar = new Jar();
     await signIn(app, jar);
-    await call(app, jar, 'PUT', '/api/region', { region: 'region-a' });
     await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
 
-    const switched = await call(app, jar, 'PUT', '/api/region', { region: 'region-b' });
-    expect(switched.json()).toMatchObject({ region: 'region-b', scope: null });
-    expect((await call(app, jar, 'GET', '/api/nodes')).json().error.code).toBe('no_scope');
-
-    await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
-    await call(app, jar, 'GET', '/api/nodes');
+    await call(app, jar, 'GET', '/api/nodes/region-a');
+    expect(ironicCalls.at(-1)?.url.startsWith(`${IRONIC_A}/v1/nodes`)).toBe(true);
+    await call(app, jar, 'GET', '/api/nodes/region-b');
     expect(ironicCalls.at(-1)?.url.startsWith(`${IRONIC_B}/v1/nodes`)).toBe(true);
+    await call(app, jar, 'GET', '/api/nodes/region-a');
+    expect(ironicCalls.at(-1)?.url.startsWith(`${IRONIC_A}/v1/nodes`)).toBe(true);
+
+    // The token is good in every region, so switching never mints another.
+    expect(scopedMints).toBe(1);
   });
 
-  it('refuses a region Keystone does not know', async () => {
+  it('keeps the selected project when the region changes', async () => {
     const app = await server();
     const jar = new Jar();
     await signIn(app, jar);
-    expect((await call(app, jar, 'PUT', '/api/region', { region: 'nowhere' })).statusCode).toBe(400);
+    await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
+
+    expect((await call(app, jar, 'GET', '/api/nodes/region-b')).statusCode).toBe(200);
+    expect((await call(app, jar, 'GET', '/api/session')).json().scope).toMatchObject({ projectId: 'p1' });
   });
 
-  it('needs a region before node data or a project', async () => {
+  it('answers 404 for a region the project has no Ironic in', async () => {
     const app = await server();
     const jar = new Jar();
     await signIn(app, jar);
-    expect((await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' })).json().error.code).toBe('no_region');
+    await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
+
+    const response = await call(app, jar, 'GET', '/api/nodes/nowhere');
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.message).toMatch(/no bare metal \(Ironic\) endpoint in region nowhere/);
+  });
+
+  it('needs a project before node data', async () => {
+    const app = await server();
+    const jar = new Jar();
+    await signIn(app, jar);
+    expect((await call(app, jar, 'GET', '/api/nodes/region-a')).json().error.code).toBe('no_scope');
+  });
+
+  it('marks every API response private and uncacheable', async () => {
+    const app = await server();
+    const jar = new Jar();
+    await signIn(app, jar);
+    expect((await call(app, jar, 'GET', '/api/session')).headers['cache-control']).toBe('private, no-store');
   });
 
   it('is served by any replica holding the same key, with nothing shared between them', async () => {
@@ -321,10 +341,9 @@ describe('encrypted session cookie', () => {
     const second = await server();
     const jar = new Jar();
     await signIn(first, jar);
-    await call(first, jar, 'PUT', '/api/region', { region: 'region-a' });
     await call(first, jar, 'PUT', '/api/scope', { projectId: 'p1' });
 
-    expect((await call(second, jar, 'GET', '/api/nodes')).statusCode).toBe(200);
+    expect((await call(second, jar, 'GET', '/api/nodes/region-a')).statusCode).toBe(200);
     expect(scopedMints).toBe(1);
   });
 
@@ -351,7 +370,6 @@ describe('encrypted session cookie', () => {
     const app = await server();
     const jar = new Jar();
     await signIn(app, jar);
-    await call(app, jar, 'PUT', '/api/region', { region: 'region-a' });
     await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
 
     const cookie = `nodedash_session=${jar.get('nodedash_session')}`;
@@ -364,7 +382,6 @@ describe('encrypted session cookie', () => {
     const app = await server();
     const jar = new Jar();
     await signIn(app, jar);
-    await call(app, jar, 'PUT', '/api/region', { region: 'region-a' });
     await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' });
 
     expect((await call(app, jar, 'POST', '/api/auth/logout')).statusCode).toBe(204);

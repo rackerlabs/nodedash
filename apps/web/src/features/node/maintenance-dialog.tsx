@@ -33,6 +33,7 @@ import { Label, Spinner } from '@/components/ui/misc';
 import { errorMessage } from '@/lib/api/client';
 import { api } from '@/lib/api/endpoints';
 import { useNodeInvalidator } from './use-node';
+import { useRegion } from '@/lib/paths';
 
 /** Reasons operators type over and over; offered as one-click fills. */
 const REASON_PRESETS = [
@@ -51,11 +52,12 @@ export function MaintenanceDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const region = useRegion();
   const [reason, setReason] = useState(node.maintenanceReason ?? '');
   const invalidate = useNodeInvalidator(node.uuid);
 
   const setMaintenance = useMutation({
-    mutationFn: () => api.setMaintenance(node.uuid, reason.trim()),
+    mutationFn: () => api.setMaintenance(region, node.uuid, reason.trim()),
     onSuccess: () => {
       toast.success('Maintenance mode enabled', { description: reason.trim() });
       invalidate();
@@ -133,9 +135,10 @@ export function ClearMaintenanceDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const region = useRegion();
   const invalidate = useNodeInvalidator(node.uuid);
   const clear = useMutation({
-    mutationFn: () => api.clearMaintenance(node.uuid),
+    mutationFn: () => api.clearMaintenance(region, node.uuid),
     onSuccess: () => {
       toast.success('Maintenance mode cleared');
       invalidate();

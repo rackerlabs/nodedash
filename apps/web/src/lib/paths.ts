@@ -28,9 +28,14 @@ export function nodePath(region: string, uuid: string, tab = ''): string {
   return `${nodesPath(region)}/${uuid}${tab ? `/${tab}` : ''}`;
 }
 
-/** Links for the region in the current URL; only valid beneath the `r/:region` route. */
+/** The region in the current URL; only valid beneath the `nodes/:region` route. */
+export function useRegion(): string {
+  return useParams().region ?? '';
+}
+
+/** Links for the region in the current URL; only valid beneath the `nodes/:region` route. */
 export function useRegionPaths() {
-  const { region = '' } = useParams();
+  const region = useRegion();
   return {
     region,
     nodes: nodesPath(region),
