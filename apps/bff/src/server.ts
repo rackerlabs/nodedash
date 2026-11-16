@@ -16,13 +16,14 @@ limitations under the License.
 
 import cookie from '@fastify/cookie';
 import formbody from '@fastify/formbody';
+import rateLimit from '@fastify/rate-limit';
 import secureSession from '@fastify/secure-session';
 import fastifyStatic from '@fastify/static';
 import { resolve } from 'node:path';
 import Fastify from 'fastify';
 import { loadConfig } from './config.ts';
 import { verifyCsrf } from './csrf.ts';
-import { HttpError } from './errors.ts';
+import { HttpError, rateLimited } from './errors.ts';
 import { IronicClient } from './ironic.ts';
 import { KeystoneClient } from './keystone.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
@@ -50,6 +51,17 @@ export async function buildServer() {
 
   await app.register(cookie);
   await app.register(formbody);
+  // Every /api route reaches Keystone or Ironic on the user's behalf, so one client
+  // could otherwise fan out unbounded upstream calls. The SPA's static files and
+  // /healthz are not limited.
+  await app.register(rateLimit, {
+    global: true,
+    max: config.rateLimitMax,
+    timeWindow: config.rateLimitWindowMs,
+    allowList: (request) => !request.url.startsWith('/api/'),
+    // Thrown, so the error handler gives it the same body as every other failure.
+    errorResponseBuilder: () => rateLimited(),
+  });
   await app.register(secureSession, [
     {
       // The whole session lives in this cookie, encrypted and authenticated with

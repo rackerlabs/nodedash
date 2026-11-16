@@ -81,6 +81,15 @@ const EnvSchema = z.object({
     .regex(/^(https?:\/\/|\/(?!\/))/, 'must be an http(s) URL or start with a single /')
     .optional(),
 
+  /**
+   * Requests per client address per window on /api. Counted per replica in memory,
+   * so the BFF stays stateless; behind a load balancer the effective ceiling is
+   * this times the replica count. Clients are told apart by the address
+   * TRUST_PROXY resolves, so many users behind one NAT share a budget.
+   */
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(6000),
+  RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
+
   /** Serve a built SPA from this directory when set. */
   STATIC_DIR: z.string().optional(),
   LOG_LEVEL: z.string().default('info'),
@@ -169,6 +178,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
         ? raw.STATIC_DIR
         : resolve(process.cwd(), raw.STATIC_DIR)
       : undefined,
+    rateLimitMax: raw.RATE_LIMIT_MAX,
+    rateLimitWindowMs: raw.RATE_LIMIT_WINDOW_SECONDS * 1000,
     logLevel: raw.LOG_LEVEL,
     trustProxy: raw.TRUST_PROXY === '1',
   };

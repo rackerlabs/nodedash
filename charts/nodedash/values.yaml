@@ -34,6 +34,9 @@ config:
   WEBSSO_PROTOCOL: openid
   IRONIC_INTERFACE: public
   LOG_LEVEL: info
+  # Per client address, per replica, on /api only.
+  RATE_LIMIT_MAX: 6000
+  RATE_LIMIT_WINDOW_SECONDS: 60
   # BRAND_NAME: nodedash
   # BRAND_TAGLINE: ""
   # BRAND_LOGO_URL: ""

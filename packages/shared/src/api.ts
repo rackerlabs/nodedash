@@ -135,4 +135,5 @@ export type ApiErrorCode =
   | 'conflict'
   | 'unsupported'
   | 'upstream_error'
+  | 'rate_limited'
   | 'bad_request';
