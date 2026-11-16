@@ -14,12 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Pencil } from 'lucide-react';
+import { useState } from 'react';
 import { CopyValue } from '@/components/copy-value';
 import { PowerStateBadge, ProvisionStateBadge } from '@/components/node-badges';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/misc';
 import { useSession } from '@/features/auth/session';
+import { ExtraFieldsDialog } from '@/features/node/extra-dialog';
 import { formatTimestamp } from '@/lib/format';
 import { useNodeContext } from './context';
 
@@ -27,6 +31,8 @@ export function NodeOverviewPage() {
   const { node, row } = useNodeContext();
   const properties = (node.properties ?? {}) as Record<string, unknown>;
   const extra = node.extra ?? {};
+  const editableFields = useSession().data?.editableExtraFields ?? [];
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -142,8 +148,14 @@ export function NodeOverviewPage() {
       </Card>
 
       <Card className="lg:col-span-3">
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Extra</CardTitle>
+          {editableFields.length > 0 ? (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil />
+              Edit
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
           {Object.keys(extra).length === 0 ? (
@@ -155,6 +167,10 @@ export function NodeOverviewPage() {
           )}
         </CardContent>
       </Card>
+
+      {editing ? (
+        <ExtraFieldsDialog node={node} fields={editableFields} open onOpenChange={setEditing} />
+      ) : null}
 
       <Card className="lg:col-span-3">
         <CardHeader>

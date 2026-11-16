@@ -116,6 +116,9 @@ export const api = {
   locateNode: (region: string, uuid: string, signal?: AbortSignal) =>
     request(`/nodes/${enc(region)}/${uuid}/locate`, { method: 'POST', schema: LocateResultSchema, signal }),
 
+  setExtra: (region: string, uuid: string, values: Record<string, string>) =>
+    request(`/nodes/${enc(region)}/${uuid}/extra`, { method: 'PATCH', body: { values }, schema: NodeSchema }),
+
   setMaintenance: (region: string, uuid: string, reason: string) =>
     request(`/nodes/${enc(region)}/${uuid}/maintenance`, { method: 'PUT', body: { reason }, schema: NodeSchema }),
 

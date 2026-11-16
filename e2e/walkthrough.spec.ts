@@ -282,6 +282,27 @@ test.describe('node detail', () => {
     await expect(page.getByText('In maintenance.')).toBeHidden();
   });
 
+  test('sets the allowed extra fields, creating one the node does not have', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    await openFirstNode(page);
+
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit node details' });
+    // Only the configured fields are offered, nothing free-form.
+    await expect(dialog.getByRole('textbox')).toHaveCount(3);
+    await expect(dialog.getByLabel('external_cmdb_id')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await dialog.getByLabel('rack', { exact: true }).fill('R-42');
+    await dialog.getByLabel('position', { exact: true }).fill('17');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('R-42')).toBeVisible();
+    await expect(page.getByText('17', { exact: true })).toBeVisible();
+  });
+
   test('a hard power action on a deployed node requires typing the node name', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);

@@ -45,5 +45,6 @@ export function sessionView(request: FastifyRequest, config: Config): Session {
       label: provider.label,
     })),
     branding: config.branding,
+    editableExtraFields: config.editableExtraFields,
   };
 }

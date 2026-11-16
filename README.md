@@ -58,7 +58,8 @@ and description, domain filters and recents. Ironic answers per project, so this
 
 **Actions** — set or clear maintenance with a required reason; power on, off and reboot (graceful offered
 first, hard actions on a node running an instance need the node name typed out); run a runbook through the
-`service` verb; enable a graphical console and open it in a new window.
+`service` verb; enable a graphical console and open it in a new window; set the allowed keys of a node's
+`extra` field (see below).
 
 **Shared links** — `/nodes/<uuid>` works with nothing selected. It tries the current project, then the one
 remembered from last visit, then fans out across every project the user can see (bounded concurrency) and
@@ -139,6 +140,16 @@ serves any deployment:
 | `BRAND_NAME` | `nodedash` | Tab title, header and sign-in page |
 | `BRAND_TAGLINE` | Hardware administration for OpenStack Ironic bare metal nodes. | Sign-in page; empty hides it |
 | `BRAND_LOGO_URL` | unset (default icon) | An http(s) URL, or a same-origin path such as a file in `STATIC_DIR` |
+
+### Editable node fields
+
+The Overview tab can do what `openstack baremetal node set --extra key=value` does, but only for the keys the
+deployment names in `EDITABLE_EXTRA_FIELDS` (comma separated, for example `external_cmdb_id,rack,position`; unset by default, which leaves editing off). The BFF
+refuses any other key, so it is not just a hidden form field. Setting a key a node does not have yet creates it,
+and values are non-empty strings of up to 255 characters. Keys may contain letters, digits, `_`, `.` and `-`.
+Unset or empty the variable to turn editing off. Each change is audit logged with the field and value.
+
+Removing a key (`node unset --extra`) is not offered.
 
 ### Regions and the service catalog
 

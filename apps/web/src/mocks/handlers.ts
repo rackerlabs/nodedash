@@ -167,6 +167,10 @@ export const handlers = [
     respond(() => backend.locateNode(String(params.uuid))),
   ),
 
+  http.patch('/api/nodes/:region/:uuid/extra', async ({ params, request }) => {
+    const { values } = await body<{ values: unknown }>(request);
+    return respond(() => backend.setExtra(String(params.uuid), values));
+  }),
   http.put('/api/nodes/:region/:uuid/maintenance', async ({ params, request }) => {
     const { reason } = await body<{ reason: string }>(request);
     return respond(() => backend.setMaintenance(String(params.uuid), reason ?? ''));
