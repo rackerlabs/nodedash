@@ -207,10 +207,7 @@ function isDell(trait: HardwareTrait): boolean {
  * box managed by the generic `redfish` driver cannot, and that is a case worth
  * being able to see in the UI.
  */
-const HARDWARE_MODELS: Record<
-  HardwareTrait,
-  { manufacturer: string; product: string; drivers: string[] }
-> = {
+const HARDWARE_MODELS: Record<HardwareTrait, { manufacturer: string; product: string; drivers: string[] }> = {
   CUSTOM_DELL_R650: {
     manufacturer: 'Dell Inc.',
     product: 'PowerEdge R650',
@@ -899,4 +896,36 @@ function buildPorts(rng: Rng, node: IronicNode): IronicPort[] {
       updated_at: node.updated_at ?? created,
     };
   });
+}
+
+/**
+ * Makes an inspected node's inventory agree with its ports: one interface per port
+ * carrying the port's MAC, and the LLDP neighbour the switch would have reported.
+ * Done on read rather than in buildInventory so no existing fixture shifts. The
+ * third port hears a different switch port than it is configured for, and the
+ * fourth reports "Not Available", so a reviewer sees a mismatch and a gap.
+ */
+export function withPortLldp(data: NodeInventory, ports: IronicPort[]): NodeInventory {
+  const parsed: Record<string, unknown> = {};
+  const interfaces = ports.map((port, index) => {
+    const name = `eno${index + 1}`;
+    const link = port.local_link_connection;
+    // Real inspection data carries only the chassis and port id, and writes the
+    // literal "Not Available" for an interface that heard no neighbour.
+    if (link) {
+      parsed[name] =
+        index === 3
+          ? { switch_chassis_id: 'Not Available', switch_port_id: 'Not Available' }
+          : {
+              switch_chassis_id: link.switch_id,
+              switch_port_id: index === 2 ? 'Ethernet1/51' : link.port_id,
+            };
+    }
+    return { ...data.inventory.interfaces?.[index], name, mac_address: port.address };
+  });
+  return {
+    ...data,
+    inventory: { ...data.inventory, interfaces },
+    plugin_data: { ...data.plugin_data, parsed_lldp: parsed },
+  };
 }

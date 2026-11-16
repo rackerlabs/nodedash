@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IronicPort } from './ironic.ts';
+import type { IronicPort, NodeInventory } from './ironic.ts';
 
 /**
  * Where Neutron's VIF for a port is recorded, keyed by what the VIF is for.
@@ -76,4 +76,70 @@ export function toPortRow(port: IronicPort): PortRow {
     category: port.category ?? null,
     isSmartnic: port.is_smartnic === true,
   };
+}
+
+/** What the switch told the node over LLDP during inspection. */
+export interface PortLldp {
+  switchName: string | null;
+  switchPort: string | null;
+  chassisId: string | null;
+}
+
+/** What inspection writes for an interface that heard no LLDP frame, instead of leaving it out. */
+const LLDP_ABSENT = 'not available';
+
+function text(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  return value.toLowerCase() === LLDP_ABSENT ? null : value;
+}
+
+/**
+ * LLDP neighbours by MAC address. Inspection records the parsed neighbour of each
+ * interface under `plugin_data.parsed_lldp`, keyed by interface name, while the
+ * MAC lives on the inventory's interface list, so the two are joined here. Ironic
+ * ports are matched on that MAC. Interfaces that heard no neighbour are left out.
+ *
+ * Inspection records only the chassis id (a MAC) and port id; a switch name is
+ * there only when the collector also parsed `switch_system_name`.
+ */
+export function lldpByMac(
+  data: Pick<NodeInventory, 'inventory' | 'plugin_data'> | null | undefined,
+): Map<string, PortLldp> {
+  const result = new Map<string, PortLldp>();
+  const parsed = data?.plugin_data?.parsed_lldp;
+  if (!parsed || typeof parsed !== 'object') return result;
+
+  for (const nic of data?.inventory.interfaces ?? []) {
+    const neighbour = nic.name ? (parsed as Record<string, unknown>)[nic.name] : null;
+    if (!nic.mac_address || !neighbour || typeof neighbour !== 'object') continue;
+    const fields = neighbour as Record<string, unknown>;
+    const lldp = {
+      switchName: text(fields.switch_system_name),
+      switchPort: text(fields.switch_port_id),
+      chassisId: text(fields.switch_chassis_id),
+    };
+    if (lldp.switchName || lldp.switchPort || lldp.chassisId) result.set(nic.mac_address.toLowerCase(), lldp);
+  }
+  return result;
+}
+
+/**
+ * True when the switch reports a different switch or port than Ironic is
+ * configured with, which usually means the node was recabled or the port's
+ * local_link_connection is stale. Only fields known on both sides are compared,
+ * so missing data is never flagged. The switch is matched by chassis id against
+ * Ironic's switch_id (both MACs) and, when the neighbour is named, by name too.
+ */
+export function lldpMismatch(
+  port: Pick<PortRow, 'switchName' | 'switchId' | 'switchPort'>,
+  lldp: PortLldp | null,
+): boolean {
+  if (!lldp) return false;
+  const differs = (configured: string | null, seen: string | null) =>
+    configured !== null && seen !== null && configured.toLowerCase() !== seen.toLowerCase();
+  return (
+    differs(port.switchId, lldp.chassisId) ||
+    differs(port.switchName, lldp.switchName) ||
+    differs(port.switchPort, lldp.switchPort)
+  );
 }

@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 import { useQuery } from '@tanstack/react-query';
+import { lldpByMac, lldpMismatch, toPortRow, type PortLldp } from '@nodedash/shared';
+import { useMemo } from 'react';
 import { Cpu, HardDrive, MemoryStick, Network, RefreshCw, ScanSearch } from 'lucide-react';
 import { DataTable, type DataColumn } from '@/components/data-table';
 import { JsonViewer } from '@/components/json-viewer';
@@ -35,6 +37,8 @@ type Disk = NonNullable<NonNullable<ReturnType<typeof useInventory>['data']>['in
 type Interface = NonNullable<
   NonNullable<ReturnType<typeof useInventory>['data']>['inventory']['interfaces']
 >[number];
+/** An interface plus what its switch reported over LLDP, and whether that disagrees with Ironic's port. */
+type NicRow = Interface & { lldp: PortLldp | null; lldpMismatch: boolean };
 
 function useInventory(uuid: string) {
   const region = useRegion();
@@ -47,7 +51,28 @@ function useInventory(uuid: string) {
 
 export function NodeInventoryPage() {
   const { node } = useNodeContext();
+  const region = useRegion();
   const query = useInventory(node.uuid);
+  // Only for comparison: the configured switch and port live on the Ironic port, matched by MAC.
+  // Nodes without ports, or an Ironic that refuses, simply get no highlight.
+  const ports = useQuery({
+    queryKey: qk.ports(region, node.uuid),
+    queryFn: () => api.ports(region, node.uuid),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const nics = useMemo<NicRow[]>(() => {
+    const lldp = lldpByMac(query.data);
+    const configured = new Map(
+      (ports.data?.ports ?? []).map((port) => [port.address.toLowerCase(), toPortRow(port)]),
+    );
+    return (query.data?.inventory.interfaces ?? []).map((nic) => {
+      const mac = nic.mac_address?.toLowerCase() ?? '';
+      const seen = lldp.get(mac) ?? null;
+      const port = configured.get(mac);
+      return { ...nic, lldp: seen, lldpMismatch: port ? lldpMismatch(port, seen) : false };
+    });
+  }, [query.data, ports.data]);
 
   if (query.isPending) {
     return (
@@ -74,7 +99,6 @@ export function NodeInventoryPage() {
 
   const inventory = query.data.inventory;
   const disks = inventory.disks ?? [];
-  const interfaces = inventory.interfaces ?? [];
   // Not every inspection reports a byte total; the physical figure is the same memory in MiB.
   const totalBytes =
     inventory.memory?.total ??
@@ -121,7 +145,7 @@ export function NodeInventoryPage() {
     },
   ];
 
-  const interfaceColumns: Array<DataColumn<Interface>> = [
+  const interfaceColumns: Array<DataColumn<NicRow>> = [
     {
       id: 'name',
       header: 'Interface',
@@ -135,6 +159,44 @@ export function NodeInventoryPage() {
       width: '12rem',
       value: (nic) => nic.mac_address ?? '',
       render: (nic) => <span className="font-mono text-[12px]">{nic.mac_address ?? '—'}</span>,
+    },
+    {
+      id: 'lldpSwitch',
+      header: 'LLDP switch',
+      width: 'minmax(18rem, 1.2fr)',
+      value: (nic) => nic.lldp?.switchName ?? nic.lldp?.chassisId ?? '',
+      render: (nic) => {
+        const name = nic.lldp?.switchName ?? nic.lldp?.chassisId;
+        return name ? (
+          <span
+            className={cn('truncate font-mono text-[12px]', nic.lldpMismatch && 'text-warning')}
+            title={nic.lldp?.chassisId ?? undefined}
+          >
+            {name}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
+    },
+    {
+      id: 'lldpPort',
+      header: 'LLDP port',
+      width: '10rem',
+      value: (nic) => nic.lldp?.switchPort ?? '',
+      render: (nic) =>
+        nic.lldp?.switchPort ? (
+          <span
+            className={cn('font-mono text-[12px]', nic.lldpMismatch && 'text-warning')}
+            title={
+              nic.lldpMismatch ? 'Differs from the switch and port Ironic is configured with' : undefined
+            }
+          >
+            {nic.lldp.switchPort}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       id: 'speed',
@@ -238,7 +300,7 @@ export function NodeInventoryPage() {
           Network interfaces
         </h2>
         <DataTable
-          rows={interfaces}
+          rows={nics}
           columns={interfaceColumns}
           getRowId={(nic, index) => nic.mac_address ?? String(index)}
           ariaLabel="Network interfaces"
