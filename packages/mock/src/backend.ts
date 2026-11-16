@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import {
+  buildExtraPatch,
   DEFAULT_BRANDING,
   buildCapabilityReport,
   canRunServiceSteps,
@@ -138,6 +139,7 @@ export interface MockBackend {
   listNodes(query: { limit?: number; marker?: string }): { nodes: IronicNode[]; next: string | null };
   getNode(uuid: string): IronicNode;
   locateNode(uuid: string): LocateResult;
+  setExtra(uuid: string, values: unknown): IronicNode;
   setMaintenance(uuid: string, reason: string): IronicNode;
   clearMaintenance(uuid: string): IronicNode;
   setPower(uuid: string, target: PowerTarget): void;
@@ -208,6 +210,7 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     expiresAt: null,
     identityProviders,
     branding: DEFAULT_BRANDING,
+    editableExtraFields: ['external_cmdb_id', 'rack', 'position'],
   };
 
   function scopeFor(project: Project): Scope {
@@ -507,6 +510,18 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
         // honest about why a cold deep link took a moment.
         projectsSearched: fixtures.projects.findIndex((candidate) => candidate.id === project.id) + 1,
       };
+    },
+
+    setExtra(uuid: string, values: unknown) {
+      const node = nodeInScope(uuid);
+      // The BFF enforces the allowlist before Ironic is called, so refuse here too.
+      const built = buildExtraPatch(session.editableExtraFields, values);
+      if ('error' in built) throw new MockApiError(400, 'bad_request', built.error);
+      // Ironic's `add` on an object member creates or replaces it.
+      node.extra = { ...(node.extra ?? {}) };
+      for (const op of built.patch) node.extra[op.path.slice('/extra/'.length)] = op.value;
+      node.updated_at = new Date(now()).toISOString();
+      return node;
     },
 
     setMaintenance(uuid: string, reason: string) {

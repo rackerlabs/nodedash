@@ -73,6 +73,27 @@ describe('mock backend: node visibility', () => {
   });
 });
 
+describe('mock backend: extra fields', () => {
+  it('creates a field the node lacks and replaces one it has', () => {
+    const { backend, nodes } = setup();
+    const uuid = nodes[0]!.uuid;
+    backend.setExtra(uuid, { rack: 'A1' });
+    expect(backend.setExtra(uuid, { rack: 'B2', position: '4' }).extra).toMatchObject({
+      rack: 'B2',
+      position: '4',
+    });
+  });
+
+  it('refuses a field outside the allowlist and leaves the node alone', () => {
+    const { backend, nodes } = setup();
+    const before = { ...backend.getNode(nodes[0]!.uuid).extra };
+    expect(() => backend.setExtra(nodes[0]!.uuid, { rack: 'A1', driver: 'x' })).toThrowError(
+      /not an editable field/,
+    );
+    expect(backend.getNode(nodes[0]!.uuid).extra).toEqual(before);
+  });
+});
+
 describe('mock backend: maintenance', () => {
   it('requires a reason', () => {
     const { backend, nodes } = setup();

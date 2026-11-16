@@ -80,6 +80,8 @@ export const SessionSchema = z.object({
   expiresAt: z.string().nullish(),
   identityProviders: z.array(IdentityProviderSchema).default([]),
   branding: BrandingSchema.default(DEFAULT_BRANDING),
+  /** Keys of a node's `extra` the deployment lets the UI write; see buildExtraPatch. */
+  editableExtraFields: z.array(z.string()).default([]),
 });
 export type Session = z.infer<typeof SessionSchema>;
 

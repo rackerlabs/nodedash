@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { isAbsolute, resolve } from 'node:path';
-import { DEFAULT_BRANDING } from '@nodedash/shared';
+import { DEFAULT_BRANDING, EXTRA_FIELD_NAME } from '@nodedash/shared';
 import { z } from 'zod';
 
 /**
@@ -72,6 +72,13 @@ const EnvSchema = z.object({
    */
   GRAPHICAL_CONSOLE_TYPE: z.string().default(''),
 
+  /**
+   * Comma-separated keys of a node's `extra` field the UI may set or change. Any
+   * other key is refused, so this is the whole write surface for `extra`. Unset or
+   * empty turns editing off.
+   */
+  EDITABLE_EXTRA_FIELDS: z.string().default(''),
+
   /** Name shown in the page title, header and sign-in page. */
   BRAND_NAME: z.string().min(1).default(DEFAULT_BRANDING.name),
   BRAND_TAGLINE: z.string().default(DEFAULT_BRANDING.tagline),
@@ -116,6 +123,20 @@ function parseIdentityProviders(raw: string, defaultProtocol: string): IdentityP
       };
     })
     .filter((provider) => provider.id.length > 0);
+}
+
+function parseExtraFields(raw: string): string[] {
+  const fields = raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const bad = fields.find((field) => !EXTRA_FIELD_NAME.test(field));
+  if (bad !== undefined) {
+    throw new Error(
+      `Invalid environment configuration:\n  EDITABLE_EXTRA_FIELDS: "${bad}" may only contain letters, digits, "_", "." and "-"`,
+    );
+  }
+  return [...new Set(fields)];
 }
 
 /** libsodium secretbox keys are exactly this long. */
@@ -171,6 +192,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       .filter(Boolean),
     maxNodePages: raw.MAX_NODE_PAGES,
     graphicalConsoleType: raw.GRAPHICAL_CONSOLE_TYPE || null,
+    editableExtraFields: parseExtraFields(raw.EDITABLE_EXTRA_FIELDS),
     branding: { name: raw.BRAND_NAME, tagline: raw.BRAND_TAGLINE, logoUrl: raw.BRAND_LOGO_URL ?? null },
     // Static file serving needs an absolute root, so resolve it against the cwd.
     staticDir: raw.STATIC_DIR

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 export * from './api.ts';
+export * from './extra.ts';
 export * from './health.ts';
 export * from './ironic.ts';
 export * from './keystone.ts';

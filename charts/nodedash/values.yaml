@@ -37,6 +37,9 @@ config:
   # Per client address, per replica, on /api only.
   RATE_LIMIT_MAX: 6000
   RATE_LIMIT_WINDOW_SECONDS: 60
+  # Keys of a node's extra field the UI may set; anything else is refused.
+  # Unset means editing is off.
+  # EDITABLE_EXTRA_FIELDS: external_cmdb_id,rack,position
   # BRAND_NAME: nodedash
   # BRAND_TAGLINE: ""
   # BRAND_LOGO_URL: ""

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import {
+  buildExtraPatch,
   POWER_TARGETS,
   type IronicNode,
   type LocateResult,
@@ -98,6 +99,29 @@ export function registerNodeRoutes(
       projectsSearched: outcome.projectsSearched,
     };
   });
+
+  /**
+   * `openstack baremetal node set --extra key=value`, limited to the keys in
+   * EDITABLE_EXTRA_FIELDS. The check is here and not only in the form, because the
+   * form is not a boundary.
+   */
+  app.patch<{ Params: NodeParams; Body: { values?: unknown } }>(
+    '/api/nodes/:region/:uuid/extra',
+    async (request) => {
+      const built = buildExtraPatch(config.editableExtraFields, request.body?.values);
+      if ('error' in built) throw badRequest(built.error);
+
+      const target = await ironicTarget(keystone, request);
+      const detail = { fields: built.patch.map((op) => ({ field: op.path.slice('/extra/'.length), value: op.value })) };
+      audit(request, { action: 'node.extra.set', nodeUuid: request.params.uuid, outcome: 'requested', detail });
+      const node = await ironic.json<IronicNode>(target, nodePath(request.params.uuid), {
+        method: 'PATCH',
+        body: built.patch,
+      });
+      audit(request, { action: 'node.extra.set', nodeUuid: request.params.uuid, outcome: 'succeeded', detail });
+      return node;
+    },
+  );
 
   app.put<{ Params: NodeParams; Body: { reason?: string } }>(
     '/api/nodes/:region/:uuid/maintenance',
