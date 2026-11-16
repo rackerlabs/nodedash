@@ -15,16 +15,18 @@ limitations under the License.
 */
 
 import { useQuery } from '@tanstack/react-query';
-import { Cpu, HardDrive, MemoryStick, Network, ScanSearch } from 'lucide-react';
+import { Cpu, HardDrive, MemoryStick, Network, RefreshCw, ScanSearch } from 'lucide-react';
 import { DataTable, type DataColumn } from '@/components/data-table';
 import { JsonViewer } from '@/components/json-viewer';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, Field, Skeleton } from '@/components/ui/misc';
 import { isNotFound } from '@/lib/api/client';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
 import { formatBytes } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
 import { useRegion } from '@/lib/paths';
@@ -73,6 +75,11 @@ export function NodeInventoryPage() {
   const inventory = query.data.inventory;
   const disks = inventory.disks ?? [];
   const interfaces = inventory.interfaces ?? [];
+  // Not every inspection reports a byte total; the physical figure is the same memory in MiB.
+  const totalBytes =
+    inventory.memory?.total ??
+    (inventory.memory?.physical_mb ? inventory.memory.physical_mb * 1024 * 1024 : null);
+  const totalGib = totalBytes === null ? null : totalBytes / 1024 ** 3;
 
   const diskColumns: Array<DataColumn<Disk>> = [
     {
@@ -118,7 +125,7 @@ export function NodeInventoryPage() {
     {
       id: 'name',
       header: 'Interface',
-      width: '9rem',
+      width: '15rem',
       value: (nic) => nic.name ?? '',
       render: (nic) => <span className="font-mono text-[12px]">{nic.name ?? '—'}</span>,
     },
@@ -130,28 +137,12 @@ export function NodeInventoryPage() {
       render: (nic) => <span className="font-mono text-[12px]">{nic.mac_address ?? '—'}</span>,
     },
     {
-      id: 'ipv4',
-      header: 'IPv4',
-      width: '11rem',
-      value: (nic) => nic.ipv4_address ?? '',
-      render: (nic) => <span className="font-mono text-[12px]">{nic.ipv4_address ?? '—'}</span>,
-    },
-    {
       id: 'speed',
       header: 'Speed',
       width: '8rem',
       value: (nic) => nic.speed_mbps ?? 0,
       render: (nic) => (
         <span className="tabular">{nic.speed_mbps ? `${(nic.speed_mbps / 1000).toFixed(0)} Gb/s` : '—'}</span>
-      ),
-    },
-    {
-      id: 'link',
-      header: 'Link',
-      width: '7rem',
-      value: (nic) => (nic.has_carrier ? 'up' : 'down'),
-      render: (nic) => (
-        <Badge tone={nic.has_carrier ? 'active' : 'neutral'}>{nic.has_carrier ? 'up' : 'down'}</Badge>
       ),
     },
     {
@@ -200,16 +191,10 @@ export function NodeInventoryPage() {
           <CardContent>
             <dl>
               <Field label="Total" mono>
-                {formatBytes(inventory.memory?.total)}
+                {totalGib === null ? '—' : `${Number(totalGib.toFixed(1))} GiB`}
               </Field>
               <Field label="Physical" mono>
                 {inventory.memory?.physical_mb ? `${inventory.memory.physical_mb} MiB` : '—'}
-              </Field>
-              <Field label="Boot mode" mono>
-                {inventory.boot?.current_boot_mode ?? '—'}
-              </Field>
-              <Field label="PXE interface" mono>
-                {inventory.boot?.pxe_interface ?? '—'}
               </Field>
             </dl>
           </CardContent>
@@ -225,9 +210,6 @@ export function NodeInventoryPage() {
               <Field label="Manufacturer">{inventory.system_vendor?.manufacturer ?? '—'}</Field>
               <Field label="Serial number" mono>
                 {inventory.system_vendor?.serial_number ?? '—'}
-              </Field>
-              <Field label="BIOS firmware" mono>
-                {inventory.system_vendor?.firmware?.version ?? '—'}
               </Field>
             </dl>
           </CardContent>
@@ -267,7 +249,19 @@ export function NodeInventoryPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold">Raw introspection data</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Raw introspection data</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCw className={cn('size-3.5', query.isFetching && 'animate-spin')} />
+            Refresh
+          </Button>
+        </div>
         <JsonViewer value={query.data} filterPlaceholder="Filter raw inventory…" />
       </section>
     </div>

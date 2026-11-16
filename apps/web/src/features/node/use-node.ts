@@ -86,6 +86,18 @@ export function useResolvedNode(uuid: string) {
     refetchIntervalInBackground: true,
   });
 
+  // The detail tabs (inventory, BIOS, firmware, ports) cache for minutes and the
+  // node poll only refreshes the node itself. An inspection, clean or service run
+  // is what rewrites them, so when the node stops settling mark them all stale.
+  const settling = nodeIsSettling(node.data);
+  const wasSettling = useRef(false);
+  useEffect(() => {
+    if (wasSettling.current && !settling) {
+      void queryClient.invalidateQueries({ queryKey: qk.node(region, uuid) });
+    }
+    wasSettling.current = settling;
+  }, [settling, queryClient, region, uuid]);
+
   // No scope yet: adopt the remembered project, or go straight to the fan-out.
   useEffect(() => {
     if (scope || setScope.isPending || locate.isPending || unresolvable) return;
