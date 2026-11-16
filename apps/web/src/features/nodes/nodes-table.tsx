@@ -27,6 +27,7 @@ import type { NodeRow } from '@nodedash/shared';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { useNavigate } from 'react-router';
+import { useRegionPaths } from '@/lib/paths';
 import { cn } from '@/lib/utils';
 import { nodeColumns, type ColumnMeta } from './columns';
 
@@ -54,6 +55,7 @@ export function NodesTable({
   sortedRowsRef?: Ref<() => NodeRow[]>;
 }) {
   const navigate = useNavigate();
+  const paths = useRegionPaths();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const table = useReactTable({
@@ -157,9 +159,9 @@ export function NodesTable({
                 tabIndex={0}
                 // Clicking anywhere on the row navigates, but the name cell also
                 // holds a real link so a node can be opened in a new tab.
-                onClick={() => void navigate(`/nodes/${node.uuid}`)}
+                onClick={() => void navigate(paths.node(node.uuid))}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') void navigate(`/nodes/${node.uuid}`);
+                  if (event.key === 'Enter') void navigate(paths.node(node.uuid));
                 }}
                 className={cn(
                   'absolute top-0 left-0 grid w-full cursor-pointer items-center border-b border-border/60 text-sm',

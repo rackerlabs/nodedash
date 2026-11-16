@@ -36,6 +36,7 @@ import {
 } from '@/features/node/use-support-assist';
 import { ScopePickerDialog } from '@/features/scope/scope-picker';
 import { formatCount } from '@/lib/format';
+import { useRegionPaths } from '@/lib/paths';
 import { cn } from '@/lib/utils';
 import { ErrorPanel, FullPageSpinner } from '../status';
 import type { NodeContext } from './context';
@@ -67,6 +68,7 @@ const TABS: TabDefinition[] = [
 
 export function NodeLayout() {
   const { uuid = '' } = useParams();
+  const paths = useRegionPaths();
   const { node, phase, isLocating, projectsSearched, retry } = useResolvedNode(uuid);
   const capabilities = useCapabilities();
   const { supported: supportAssistSupported } = useSupportAssistSupported(uuid, {
@@ -130,7 +132,7 @@ export function NodeLayout() {
         <div className="flex flex-col gap-3 px-4 py-4">
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="ghost" size="sm" asChild className="-ml-2 gap-1.5 text-muted-foreground">
-              <Link to="/nodes">
+              <Link to={paths.nodes}>
                 <ArrowLeft className="size-4" />
                 All nodes
               </Link>
@@ -226,7 +228,7 @@ export function NodeLayout() {
               return (
                 <NavLink
                   key={tab.label}
-                  to={tab.to === '' ? `/nodes/${uuid}` : `/nodes/${uuid}/${tab.to}`}
+                  to={paths.node(uuid, tab.to)}
                   end={tab.end}
                   className={({ isActive }) =>
                     cn(

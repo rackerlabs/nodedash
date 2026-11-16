@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter } from 'react-router';
 import { AppShell } from '@/components/app-shell';
-import { RequireAuth, RequireRegion, RequireScope } from './guards';
+import { RegionEntry, RegionHome, RequireAuth, RequireRegion, RequireScope } from './guards';
 import { LoginPage } from './login';
 import { MockConsolePage } from './mock-console';
 import { NodeBiosPage } from './node/bios';
@@ -37,21 +37,21 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       {
-        // Every node request goes to one region's Ironic, so pick that first.
+        // Every node request goes to one region's Ironic, so the URL names it.
+        path: 'nodes/:region',
         element: <RequireRegion />,
         children: [
           {
             element: <AppShell />,
             children: [
-              { index: true, element: <Navigate to="/nodes" replace /> },
               {
                 // The fleet view needs a project up front; a node deep link does not,
                 // because the node route resolves its own scope from the UUID.
                 element: <RequireScope />,
-                children: [{ path: 'nodes', element: <NodesPage /> }],
+                children: [{ index: true, element: <NodesPage /> }],
               },
               {
-                path: 'nodes/:uuid',
+                path: ':uuid',
                 element: <NodeLayout />,
                 children: [
                   { index: true, element: <NodeOverviewPage /> },
@@ -62,13 +62,16 @@ export const router = createBrowserRouter([
                   { path: 'logs', element: <NodeLogsPage /> },
                   { path: 'runbooks', element: <NodeRunbooksPage /> },
                   { path: 'support-assist', element: <NodeSupportAssistPage /> },
+                  { path: '*', element: <RegionHome /> },
                 ],
               },
+              { path: '*', element: <RegionHome /> },
             ],
           },
         ],
       },
+      // `/`, `/nodes` and anything else that does not name a region.
+      { path: '*', element: <RegionEntry /> },
     ],
   },
-  { path: '*', element: <Navigate to="/nodes" replace /> },
 ]);

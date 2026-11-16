@@ -33,6 +33,7 @@ import { BrandMark, useBranding } from '@/features/branding/branding';
 import { ScenarioSwitcher } from '@/features/mock/scenario-switcher';
 import { RegionMenu } from '@/features/region/region-picker';
 import { ScopePickerDialog } from '@/features/scope/scope-picker';
+import { useRegionPaths } from '@/lib/paths';
 import { applyTheme, readTheme, type Theme } from '@/lib/theme';
 
 export function AppShell() {
@@ -40,6 +41,7 @@ export function AppShell() {
   const capabilities = useCapabilities();
   const logout = useLogout();
   const navigate = useNavigate();
+  const paths = useRegionPaths();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => readTheme());
 
@@ -67,7 +69,7 @@ export function AppShell() {
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="flex h-14 items-center gap-3 px-4">
-          <Link to="/nodes" className="flex items-center gap-2 font-semibold tracking-tight">
+          <Link to={paths.nodes} className="flex items-center gap-2 font-semibold tracking-tight">
             <BrandMark className="size-5" />
             <span className="hidden sm:inline">{branding.name}</span>
           </Link>
@@ -164,7 +166,7 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <ScopePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelected={() => navigate('/nodes')} />
+      <ScopePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelected={() => navigate(paths.nodes)} />
     </div>
   );
 }

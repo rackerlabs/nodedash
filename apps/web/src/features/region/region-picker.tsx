@@ -27,13 +27,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Spinner } from '@/components/ui/misc';
-import { useRegions, useSession, useSetRegion } from '@/features/auth/session';
-import { errorMessage } from '@/lib/api/client';
+import { useRegions } from '@/features/auth/session';
+import { nodesPath, useRegionPaths } from '@/lib/paths';
 
-/** Full-page choice shown after sign-in when Keystone offers more than one region. */
-export function RegionChooser({ regions }: { regions: Region[] }) {
-  const setRegion = useSetRegion();
+/**
+ * Full-page choice shown when a URL does not say which region it is for and
+ * Keystone offers more than one. Picking one just navigates; the region guard
+ * makes the session follow the URL.
+ */
+export function RegionChooser({
+  regions,
+  target = nodesPath,
+  notice,
+}: {
+  regions: Region[];
+  /** Where choosing a region leads. */
+  target?: (region: string) => string;
+  notice?: string;
+}) {
+  const navigate = useNavigate();
 
   return (
     <div className="flex min-h-full items-center justify-center px-6 py-16">
@@ -48,15 +60,15 @@ export function RegionChooser({ regions }: { regions: Region[] }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          {notice ? <p className="text-sm text-destructive">{notice}</p> : null}
           {regions.map((region) => (
             <Button
               key={region.id}
               variant="outline"
               className="h-auto w-full justify-start gap-3 py-2 text-left"
-              disabled={setRegion.isPending}
-              onClick={() => setRegion.mutate(region.id)}
+              onClick={() => void navigate(target(region.id))}
             >
-              {setRegion.isPending && setRegion.variables === region.id ? <Spinner /> : <Globe />}
+              <Globe />
               <span className="flex flex-col">
                 <span className="font-mono text-sm">{region.id}</span>
                 {region.description ? (
@@ -65,7 +77,6 @@ export function RegionChooser({ regions }: { regions: Region[] }) {
               </span>
             </Button>
           ))}
-          {setRegion.isError ? <p className="text-sm text-destructive">{errorMessage(setRegion.error)}</p> : null}
         </CardContent>
       </Card>
     </div>
@@ -74,14 +85,12 @@ export function RegionChooser({ regions }: { regions: Region[] }) {
 
 /** Header control for the current region. Hidden when there is nothing to switch to. */
 export function RegionMenu() {
-  const session = useSession();
   const regions = useRegions();
-  const setRegion = useSetRegion();
   const navigate = useNavigate();
+  const { region: current } = useRegionPaths();
 
-  const current = session.data?.region ?? null;
   const list = regions.data?.regions ?? [];
-  if (!current || list.length < 2) return null;
+  if (list.length < 2) return null;
 
   return (
     <DropdownMenu>
@@ -100,10 +109,8 @@ export function RegionMenu() {
         {list.map((region) => (
           <DropdownMenuItem
             key={region.id}
-            disabled={setRegion.isPending}
             onSelect={() => {
-              if (region.id === current) return;
-              setRegion.mutate(region.id, { onSuccess: () => void navigate('/nodes') });
+              if (region.id !== current) void navigate(nodesPath(region.id));
             }}
           >
             <Check className={region.id === current ? 'opacity-100' : 'opacity-0'} />

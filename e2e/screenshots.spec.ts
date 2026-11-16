@@ -103,23 +103,23 @@ test('capture review screenshots', async ({ page }) => {
 
   const uuid = target.uuid;
   const nodeName = target.name;
-  await page.goto(`/nodes/${uuid}`);
+  await page.goto(`/nodes/lab-1/${uuid}`);
   await expect(page.getByRole('link', { name: 'All nodes' })).toBeVisible();
   await shot(page, '07-node-overview');
 
-  await page.goto(`/nodes/${uuid}/inventory`);
+  await page.goto(`/nodes/lab-1/${uuid}/inventory`);
   await expect(page.getByRole('heading', { name: 'Disks' })).toBeVisible();
   await shot(page, '08-node-inventory');
 
-  await page.goto(`/nodes/${uuid}/bios`);
+  await page.goto(`/nodes/lab-1/${uuid}/bios`);
   await expect(page.getByRole('columnheader', { name: 'Setting' })).toBeVisible();
   await shot(page, '09-node-bios');
 
-  await page.goto(`/nodes/${uuid}/firmware`);
+  await page.goto(`/nodes/lab-1/${uuid}/firmware`);
   await expect(page.getByRole('columnheader', { name: 'Component' })).toBeVisible();
   await shot(page, '10-node-firmware');
 
-  await page.goto(`/nodes/${uuid}/runbooks`);
+  await page.goto(`/nodes/lab-1/${uuid}/runbooks`);
   await expect(page.getByRole('button', { name: 'Run runbook' }).first()).toBeVisible();
   await shot(page, '11-node-runbooks');
 
@@ -132,7 +132,7 @@ test('capture review screenshots', async ({ page }) => {
   await shot(page, '12-runbook-confirm');
   await page.keyboard.press('Escape');
 
-  await page.goto(`/nodes/${uuid}`);
+  await page.goto(`/nodes/lab-1/${uuid}`);
   await page.getByRole('button', { name: 'Set maintenance' }).click();
   await page.getByRole('button', { name: 'Hardware fault, awaiting parts' }).click();
   await shot(page, '13-maintenance-dialog');

@@ -19,6 +19,7 @@ import type { NodeRow } from '@nodedash/shared';
 import { Link } from 'react-router';
 import { CopyValue } from '@/components/copy-value';
 import { MaintenanceBadge, PowerStateBadge, ProvisionStateBadge } from '@/components/node-badges';
+import { useRegionPaths } from '@/lib/paths';
 
 const helper = createColumnHelper<NodeRow>();
 
@@ -26,6 +27,19 @@ const helper = createColumnHelper<NodeRow>();
 export interface ColumnMeta {
   width: string;
   align?: 'left' | 'right';
+}
+
+function NodeNameLink({ uuid, name }: { uuid: string; name: string | null }) {
+  const paths = useRegionPaths();
+  return (
+    <Link
+      to={paths.node(uuid)}
+      onClick={(event) => event.stopPropagation()}
+      className="truncate font-medium hover:underline"
+    >
+      {name ?? <span className="text-muted-foreground italic">unnamed</span>}
+    </Link>
+  );
 }
 
 function dash(value: string | null) {
@@ -37,15 +51,7 @@ export const nodeColumns = [
     header: 'Name',
     meta: { width: 'minmax(9.5rem, 1fr)' } satisfies ColumnMeta,
     // A real link, so a node can be middle-clicked or opened in a new tab.
-    cell: (context) => (
-      <Link
-        to={`/nodes/${context.row.original.uuid}`}
-        onClick={(event) => event.stopPropagation()}
-        className="truncate font-medium hover:underline"
-      >
-        {context.getValue() ?? <span className="text-muted-foreground italic">unnamed</span>}
-      </Link>
-    ),
+    cell: (context) => <NodeNameLink uuid={context.row.original.uuid} name={context.getValue()} />,
   }),
   helper.accessor('uuid', {
     header: 'UUID',
