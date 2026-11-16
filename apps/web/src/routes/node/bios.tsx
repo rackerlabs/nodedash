@@ -104,7 +104,13 @@ export function NodeBiosPage() {
 
   if (query.isPending) return <Skeleton className="h-72 w-full" />;
   if (query.isError) {
-    return <ErrorPanel title="Could not load BIOS settings" error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorPanel
+        title="Could not load BIOS settings"
+        error={query.error}
+        onRetry={() => void query.refetch()}
+      />
+    );
   }
 
   const settings = query.data.bios;
@@ -122,8 +128,8 @@ export function NodeBiosPage() {
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">
-        Settings as last read by Ironic. This view is read-only — BIOS changes are applied through a
-        runbook or clean step so they are recorded and repeatable.
+        Settings as last read by Ironic. This view is read-only — BIOS changes are applied through a runbook
+        or clean step so they are recorded and repeatable.
       </p>
       <DataTable
         rows={settings}

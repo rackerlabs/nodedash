@@ -188,5 +188,4 @@ test('capture review screenshots', async ({ page }) => {
   await expect(page.getByTestId('node-count')).not.toHaveText('0');
   await page.getByRole('button', { name: 'Toggle theme' }).click();
   await shot(page, '21-light-theme');
-
 });

@@ -33,9 +33,7 @@ function node(overrides: Partial<IronicNode> = {}): IronicNode {
 describe('resolveInstanceName', () => {
   it('prefers the native field on recent servers', () => {
     expect(
-      resolveInstanceName(
-        node({ instance_name: 'web-01', instance_info: { display_name: 'stale-name' } }),
-      ),
+      resolveInstanceName(node({ instance_name: 'web-01', instance_info: { display_name: 'stale-name' } })),
     ).toBe('web-01');
   });
 

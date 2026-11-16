@@ -31,7 +31,9 @@ describe('buildExtraPatch', () => {
 
   it('refuses a field that is not configured, including ones that look like paths', () => {
     for (const field of ['owner', '__proto__', 'rack/../../driver', '']) {
-      expect(buildExtraPatch(allowed, { [field]: 'x' })).toMatchObject({ error: expect.stringContaining('not an editable') });
+      expect(buildExtraPatch(allowed, { [field]: 'x' })).toMatchObject({
+        error: expect.stringContaining('not an editable'),
+      });
     }
   });
 
@@ -42,7 +44,9 @@ describe('buildExtraPatch', () => {
   it('refuses empty, non-string, oversized and control-character values', () => {
     expect(buildExtraPatch(allowed, { rack: '  ' })).toHaveProperty('error');
     expect(buildExtraPatch(allowed, { rack: 12 })).toHaveProperty('error');
-    expect(buildExtraPatch(allowed, { rack: 'x'.repeat(MAX_EXTRA_VALUE_LENGTH + 1) })).toHaveProperty('error');
+    expect(buildExtraPatch(allowed, { rack: 'x'.repeat(MAX_EXTRA_VALUE_LENGTH + 1) })).toHaveProperty(
+      'error',
+    );
     expect(buildExtraPatch(allowed, { rack: 'a\nb' })).toHaveProperty('error');
   });
 

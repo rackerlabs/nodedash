@@ -158,8 +158,8 @@ function HistoryView({ uuid }: { uuid: string }) {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {events.length} of {query.data.history.length} events. Ironic records these per node; they are not
-        the IPA logs.
+        {events.length} of {query.data.history.length} events. Ironic records these per node; they are not the
+        IPA logs.
       </p>
 
       {events.length === 0 ? (
@@ -233,11 +233,7 @@ function RamdiskView({ uuid }: { uuid: string }) {
       <ul className="space-y-1.5">
         {logs.map((log) => (
           <li key={log.id}>
-            <LogArchiveButton
-              log={log}
-              active={log.id === active}
-              onClick={() => setSelected(log.id)}
-            />
+            <LogArchiveButton log={log} active={log.id === active} onClick={() => setSelected(log.id)} />
           </li>
         ))}
       </ul>

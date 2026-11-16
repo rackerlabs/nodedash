@@ -67,7 +67,11 @@ export function DataTable<T>({
     let result = [...rows];
     if (needle) {
       result = result.filter((row) =>
-        columns.some((column) => String(column.value?.(row) ?? '').toLowerCase().includes(needle)),
+        columns.some((column) =>
+          String(column.value?.(row) ?? '')
+            .toLowerCase()
+            .includes(needle),
+        ),
       );
     }
     if (sort) {

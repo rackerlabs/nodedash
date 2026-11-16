@@ -62,8 +62,7 @@ export function NodesTable({
     data: rows,
     columns: nodeColumns,
     state: { sorting, columnVisibility },
-    onSortingChange: (updater) =>
-      onSortingChange(typeof updater === 'function' ? updater(sorting) : updater),
+    onSortingChange: (updater) => onSortingChange(typeof updater === 'function' ? updater(sorting) : updater),
     onColumnVisibilityChange: (updater) =>
       onColumnVisibilityChange(typeof updater === 'function' ? updater(columnVisibility) : updater),
     getCoreRowModel: getCoreRowModel(),

@@ -109,14 +109,16 @@ export function NodeFirmwarePage() {
         />
       );
     }
-    return <ErrorPanel title="Could not load firmware" error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorPanel title="Could not load firmware" error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">
-        Firmware versions as last reported by the BMC. Updates are applied through a runbook so the change
-        is recorded against the node.
+        Firmware versions as last reported by the BMC. Updates are applied through a runbook so the change is
+        recorded against the node.
       </p>
       <DataTable
         rows={query.data.firmware}

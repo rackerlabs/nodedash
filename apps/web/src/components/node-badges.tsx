@@ -76,13 +76,7 @@ export function PowerStateBadge({
   );
 }
 
-export function MaintenanceBadge({
-  maintenance,
-  reason,
-}: {
-  maintenance: boolean;
-  reason?: string | null;
-}) {
+export function MaintenanceBadge({ maintenance, reason }: { maintenance: boolean; reason?: string | null }) {
   if (!maintenance) return <span className="text-xs text-muted-foreground">no</span>;
   return (
     <Hint label={reason ? reason : 'In maintenance, no reason recorded'}>

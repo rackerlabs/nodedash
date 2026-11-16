@@ -35,7 +35,7 @@ export function MockConsolePage() {
         <span className="ml-auto text-xs text-green-700">token {token.slice(0, 12)}…</span>
       </div>
       <pre className="whitespace-pre-wrap leading-relaxed">
-{`[    0.000000] Linux version 6.8.0-generic
+        {`[    0.000000] Linux version 6.8.0-generic
 [    0.412551] ACPI: Early table checksum verification disabled
 [    1.884210] ixgbe 0000:19:00.0 eno1: detected PHY at address 0
 [    2.104733] EXT4-fs (nvme0n1p2): mounted filesystem with ordered data mode

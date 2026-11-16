@@ -107,8 +107,7 @@ export function PowerMenu({ node, disabled }: { node: NodeRow; disabled?: boolea
           })}
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="font-normal text-xs whitespace-normal">
-            Graceful actions ask the operating system to shut down first. Hard actions cut power
-            immediately.
+            Graceful actions ask the operating system to shut down first. Hard actions cut power immediately.
           </DropdownMenuLabel>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -168,8 +167,7 @@ function TypedConfirmDialog({
           <DialogDescription>
             This node is hosting instance{' '}
             <span className="font-mono text-[12px]">{node.instanceName ?? node.instanceUuid}</span>. A hard
-            power action does not give the operating system a chance to shut down and can lose in-flight
-            work.
+            power action does not give the operating system a chance to shut down and can lose in-flight work.
           </DialogDescription>
         </DialogHeader>
 

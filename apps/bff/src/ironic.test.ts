@@ -32,9 +32,7 @@ describe('ironicMessage', () => {
 
   it('handles error_message already parsed into an object', () => {
     const body = { error_message: { faultstring: 'The requested action is not supported' } };
-    expect(ironicMessage({ status: 400, body, text: '' })).toBe(
-      'The requested action is not supported',
-    );
+    expect(ironicMessage({ status: 400, body, text: '' })).toBe('The requested action is not supported');
   });
 
   it('passes a plain string message straight through', () => {

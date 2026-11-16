@@ -24,11 +24,7 @@ import { cacheScopedToken } from '../node-request.ts';
 import { requireAuth } from '../session.ts';
 import { sessionView } from '../session-view.ts';
 
-export function registerScopeRoutes(
-  app: FastifyInstance,
-  config: Config,
-  keystone: KeystoneClient,
-): void {
+export function registerScopeRoutes(app: FastifyInstance, config: Config, keystone: KeystoneClient): void {
   app.get('/api/regions', async (request): Promise<RegionList> => {
     const auth = requireAuth(request);
     const regions = await keystone.listRegions(auth.unscopedToken);

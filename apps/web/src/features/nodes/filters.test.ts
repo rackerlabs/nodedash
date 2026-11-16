@@ -16,12 +16,7 @@ limitations under the License.
 
 import type { NodeRow } from '@nodedash/shared';
 import { describe, expect, it } from 'vitest';
-import {
-  applyNodeFilters,
-  countActiveFilters,
-  EMPTY_FILTERS,
-  provisionStateCounts,
-} from './filters.ts';
+import { applyNodeFilters, countActiveFilters, EMPTY_FILTERS, provisionStateCounts } from './filters.ts';
 
 function row(overrides: Partial<NodeRow> = {}): NodeRow {
   return {

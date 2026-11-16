@@ -101,10 +101,7 @@ export function isHardPowerTarget(target: PowerTarget): boolean {
  * A hard power action on a node that is running a tenant instance can destroy
  * work, so the UI demands the node name be typed before it will submit.
  */
-export function requiresTypedConfirmation(
-  target: PowerTarget,
-  node: Pick<NodeRow, 'instanceUuid'>,
-): boolean {
+export function requiresTypedConfirmation(target: PowerTarget, node: Pick<NodeRow, 'instanceUuid'>): boolean {
   return isHardPowerTarget(target) && Boolean(node.instanceUuid);
 }
 

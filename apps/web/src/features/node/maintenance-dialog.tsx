@@ -77,8 +77,8 @@ export function MaintenanceDialog({
             {node.maintenance ? 'Update maintenance reason' : 'Set maintenance mode'}
           </DialogTitle>
           <DialogDescription>
-            While a node is in maintenance Ironic will not deploy to it or run provisioning actions
-            against it. The reason is stored on the node and shown to everyone.
+            While a node is in maintenance Ironic will not deploy to it or run provisioning actions against
+            it. The reason is stored on the node and shown to everyone.
           </DialogDescription>
         </DialogHeader>
 

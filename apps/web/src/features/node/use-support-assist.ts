@@ -64,9 +64,7 @@ export function useSupportAssist(uuid: string, options: { enabled: boolean }) {
     queryFn: () => api.supportAssist(region, uuid),
     enabled: options.enabled,
     refetchInterval: (result) =>
-      (result.state.data?.collections ?? []).some((collection) =>
-        isSupportAssistActive(collection.state),
-      )
+      (result.state.data?.collections ?? []).some((collection) => isSupportAssistActive(collection.state))
         ? ACTIVE_POLL_MS
         : false,
     // Progress should keep advancing while the operator works in another tab.

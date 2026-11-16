@@ -54,9 +54,7 @@ describe('buildWebssoUrl', () => {
 
   it('uses the per-IdP endpoint with that IdP protocol', () => {
     const url = new URL(buildWebssoUrl(config, 'lab-oidc'));
-    expect(url.pathname).toBe(
-      '/v3/auth/OS-FEDERATION/identity_providers/lab-oidc/protocols/openid/websso',
-    );
+    expect(url.pathname).toBe('/v3/auth/OS-FEDERATION/identity_providers/lab-oidc/protocols/openid/websso');
     expect(url.searchParams.get('origin')).toBe('https://nodes.example.invalid/api/auth/websso');
   });
 
@@ -123,7 +121,9 @@ describe('loadConfig', () => {
 
   it('refuses a logo URL that is not http(s) or a same-origin path', () => {
     for (const logo of ['javascript:alert(1)', '//evil.example/logo.svg', 'logo.svg']) {
-      expect(() => loadConfig({ ...baseEnv, BRAND_LOGO_URL: logo } as NodeJS.ProcessEnv)).toThrow(/BRAND_LOGO_URL/);
+      expect(() => loadConfig({ ...baseEnv, BRAND_LOGO_URL: logo } as NodeJS.ProcessEnv)).toThrow(
+        /BRAND_LOGO_URL/,
+      );
     }
   });
 

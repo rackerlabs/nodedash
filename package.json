@@ -17,10 +17,13 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "screenshots": "SCREENSHOTS=1 playwright test screenshots.spec.ts",
-    "update:pci-ids": "node scripts/update-pci-ids.mjs"
+    "update:pci-ids": "node scripts/update-pci-ids.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
+    "prettier": "3.9.10",
     "vitest": "4.1.12"
   }
 }

@@ -101,10 +101,7 @@ export type NodeHealth = z.infer<typeof NodeHealthSchema>;
 /** How stale a reading can be before the UI calls it out. */
 export const HEALTH_STALE_AFTER_MS = 10 * 60_000;
 
-export function isHealthStale(
-  collectedAt: string | null | undefined,
-  now = Date.now(),
-): boolean {
+export function isHealthStale(collectedAt: string | null | undefined, now = Date.now()): boolean {
   if (!collectedAt) return true;
   const timestamp = new Date(collectedAt).getTime();
   if (!Number.isFinite(timestamp)) return true;

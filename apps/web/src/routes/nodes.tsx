@@ -128,7 +128,9 @@ export function NodesPage() {
             {filters.provisionStates.length > 0 ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setFilters((current) => ({ ...current, provisionStates: [] }))}>
+                <DropdownMenuItem
+                  onSelect={() => setFilters((current) => ({ ...current, provisionStates: [] }))}
+                >
                   Clear state filter
                 </DropdownMenuItem>
               </>
@@ -141,7 +143,10 @@ export function NodesPage() {
             <Button
               variant="outline"
               size="sm"
-              className={cn('gap-2', filters.maintenance !== 'all' && 'border-destructive/60 text-destructive')}
+              className={cn(
+                'gap-2',
+                filters.maintenance !== 'all' && 'border-destructive/60 text-destructive',
+              )}
             >
               <Wrench className="size-4" />
               {MAINTENANCE_LABELS[filters.maintenance]}
@@ -226,7 +231,12 @@ export function NodesPage() {
               Auto
             </Button>
           </Hint>
-          <Button variant="outline" size="sm" onClick={() => void query.refetch()} disabled={query.isFetching}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
             Refresh
           </Button>
         </div>

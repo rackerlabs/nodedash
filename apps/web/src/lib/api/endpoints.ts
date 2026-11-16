@@ -87,12 +87,15 @@ export const api = {
    * Ironic pages node listings; the fleet view needs the whole set to sort and
    * filter locally, so walk the markers and report progress as we go.
    */
-  async allNodes(region: string, options: {
-    signal?: AbortSignal;
-    onProgress?: (loaded: number) => void;
-    pageSize?: number;
-    maxPages?: number;
-  } = {}): Promise<IronicNode[]> {
+  async allNodes(
+    region: string,
+    options: {
+      signal?: AbortSignal;
+      onProgress?: (loaded: number) => void;
+      pageSize?: number;
+      maxPages?: number;
+    } = {},
+  ): Promise<IronicNode[]> {
     const { signal, onProgress, pageSize = 500, maxPages = 40 } = options;
     const nodes: IronicNode[] = [];
     let marker: string | undefined;
@@ -120,7 +123,11 @@ export const api = {
     request(`/nodes/${enc(region)}/${uuid}/extra`, { method: 'PATCH', body: { values }, schema: NodeSchema }),
 
   setMaintenance: (region: string, uuid: string, reason: string) =>
-    request(`/nodes/${enc(region)}/${uuid}/maintenance`, { method: 'PUT', body: { reason }, schema: NodeSchema }),
+    request(`/nodes/${enc(region)}/${uuid}/maintenance`, {
+      method: 'PUT',
+      body: { reason },
+      schema: NodeSchema,
+    }),
 
   clearMaintenance: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/maintenance`, { method: 'DELETE', schema: NodeSchema }),

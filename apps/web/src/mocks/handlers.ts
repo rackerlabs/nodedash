@@ -14,12 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-  createMockBackend,
-  MockApiError,
-  type MockBackend,
-  type PersistedAuth,
-} from '@nodedash/mock';
+import { createMockBackend, MockApiError, type MockBackend, type PersistedAuth } from '@nodedash/mock';
 import { delay, http, HttpResponse } from 'msw';
 import { activeScenario } from './scenario';
 
@@ -67,7 +62,10 @@ type Handler = () => unknown;
 
 function failure(error: unknown) {
   if (error instanceof MockApiError) {
-    return HttpResponse.json({ error: { code: error.code, message: error.message } }, { status: error.status });
+    return HttpResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: error.status },
+    );
   }
   return HttpResponse.json({ error: { code: 'upstream_error', message: String(error) } }, { status: 500 });
 }
@@ -264,15 +262,18 @@ export const handlers = [
    * one URL and gets a file, which is what the UI depends on.
    */
   http.get('/api/nodes/:region/:uuid/support-assist/:id/download', ({ params }) =>
-    respond(() => {
-      const file = backend.downloadSupportAssist(String(params.uuid), String(params.id));
-      return new HttpResponse(file.body, {
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${file.filename}"`,
-        },
-      });
-    }, { read: true }),
+    respond(
+      () => {
+        const file = backend.downloadSupportAssist(String(params.uuid), String(params.id));
+        return new HttpResponse(file.body, {
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${file.filename}"`,
+          },
+        });
+      },
+      { read: true },
+    ),
   ),
 
   http.get('/api/nodes/:region/:uuid/console', ({ params }) =>

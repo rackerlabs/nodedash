@@ -145,7 +145,9 @@ export function NodeInventoryPage() {
         />
       );
     }
-    return <ErrorPanel title="Could not load inventory" error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorPanel title="Could not load inventory" error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   const inventory = query.data.inventory;
@@ -264,7 +266,11 @@ export function NodeInventoryPage() {
       width: '6rem',
       value: (nic) => (nic.pxe_enabled ? 'yes' : 'no'),
       render: (nic) =>
-        nic.pxe_enabled ? <Badge tone="available">pxe</Badge> : <span className="text-muted-foreground">—</span>,
+        nic.pxe_enabled ? (
+          <Badge tone="available">pxe</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
   ];
 

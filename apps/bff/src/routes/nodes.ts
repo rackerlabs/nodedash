@@ -66,39 +66,42 @@ export function registerNodeRoutes(
    * Resolves a bare node uuid to the project that owns it, for shared links that
    * arrive with no project selected.
    */
-  app.post<{ Params: NodeParams }>('/api/nodes/:region/:uuid/locate', async (request): Promise<LocateResult> => {
-    const auth = requireRegion(request);
-    const projects = await keystone.listProjects(auth.unscopedToken);
+  app.post<{ Params: NodeParams }>(
+    '/api/nodes/:region/:uuid/locate',
+    async (request): Promise<LocateResult> => {
+      const auth = requireRegion(request);
+      const projects = await keystone.listProjects(auth.unscopedToken);
 
-    const outcome = await locateNode(request.params.uuid, {
-      config,
-      keystone,
-      ironic,
-      unscopedToken: auth.unscopedToken,
-      region: auth.region,
-      projects,
-      preferProjectIds: [request.session.scope?.projectId, request.session.lastScope?.projectId],
-    });
+      const outcome = await locateNode(request.params.uuid, {
+        config,
+        keystone,
+        ironic,
+        unscopedToken: auth.unscopedToken,
+        region: auth.region,
+        projects,
+        preferProjectIds: [request.session.scope?.projectId, request.session.lastScope?.projectId],
+      });
 
-    if (outcome.scope && outcome.scoped) {
-      request.session.scope = outcome.scope;
-      request.session.lastScope = outcome.scope;
-      rememberScopedToken(request, outcome.scoped, auth.region);
-    }
+      if (outcome.scope && outcome.scoped) {
+        request.session.scope = outcome.scope;
+        request.session.lastScope = outcome.scope;
+        rememberScopedToken(request, outcome.scoped, auth.region);
+      }
 
-    audit(request, {
-      action: 'node.locate',
-      nodeUuid: request.params.uuid,
-      outcome: outcome.scope ? 'succeeded' : 'failed',
-      detail: { projectsSearched: outcome.projectsSearched },
-    });
+      audit(request, {
+        action: 'node.locate',
+        nodeUuid: request.params.uuid,
+        outcome: outcome.scope ? 'succeeded' : 'failed',
+        detail: { projectsSearched: outcome.projectsSearched },
+      });
 
-    return {
-      found: outcome.scope !== null,
-      scope: outcome.scope,
-      projectsSearched: outcome.projectsSearched,
-    };
-  });
+      return {
+        found: outcome.scope !== null,
+        scope: outcome.scope,
+        projectsSearched: outcome.projectsSearched,
+      };
+    },
+  );
 
   /**
    * `openstack baremetal node set --extra key=value`, limited to the keys in
@@ -112,13 +115,25 @@ export function registerNodeRoutes(
       if ('error' in built) throw badRequest(built.error);
 
       const target = await ironicTarget(keystone, request);
-      const detail = { fields: built.patch.map((op) => ({ field: op.path.slice('/extra/'.length), value: op.value })) };
-      audit(request, { action: 'node.extra.set', nodeUuid: request.params.uuid, outcome: 'requested', detail });
+      const detail = {
+        fields: built.patch.map((op) => ({ field: op.path.slice('/extra/'.length), value: op.value })),
+      };
+      audit(request, {
+        action: 'node.extra.set',
+        nodeUuid: request.params.uuid,
+        outcome: 'requested',
+        detail,
+      });
       const node = await ironic.json<IronicNode>(target, nodePath(request.params.uuid), {
         method: 'PATCH',
         body: built.patch,
       });
-      audit(request, { action: 'node.extra.set', nodeUuid: request.params.uuid, outcome: 'succeeded', detail });
+      audit(request, {
+        action: 'node.extra.set',
+        nodeUuid: request.params.uuid,
+        outcome: 'succeeded',
+        detail,
+      });
       return node;
     },
   );

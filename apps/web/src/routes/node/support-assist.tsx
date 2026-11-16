@@ -92,10 +92,9 @@ export function NodeSupportAssistPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-sm text-muted-foreground">
-          A SupportAssist collection is the bundle Dell support asks for on a hardware case: the BMC
-          gathers hardware logs, configuration and optionally OS-side data into one archive, which is
-          uploaded to storage and downloadable here. Collections take a while — you can leave this page and
-          come back.
+          A SupportAssist collection is the bundle Dell support asks for on a hardware case: the BMC gathers
+          hardware logs, configuration and optionally OS-side data into one archive, which is uploaded to
+          storage and downloadable here. Collections take a while — you can leave this page and come back.
         </p>
         <Button size="sm" className="gap-2" disabled={running !== null} onClick={() => setDialogOpen(true)}>
           <Play className="size-4" />
@@ -198,13 +197,7 @@ function expiryLabel(expiresAt: string, now: number): string {
     : `expired ${relativeTime(expiresAt, now)}`;
 }
 
-function CollectionRow({
-  collection,
-  nodeUuid,
-}: {
-  collection: SupportAssistCollection;
-  nodeUuid: string;
-}) {
+function CollectionRow({ collection, nodeUuid }: { collection: SupportAssistCollection; nodeUuid: string }) {
   const region = useRegion();
   const now = useNow(30_000);
   const started = new Date(collection.started_at).getTime();
@@ -219,9 +212,7 @@ function CollectionRow({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={supportAssistTone(collection.state)}>{collection.state}</Badge>
-          <span className="font-mono text-[12px] break-all">
-            {collection.filename ?? collection.id}
-          </span>
+          <span className="font-mono text-[12px] break-all">{collection.filename ?? collection.id}</span>
           {holdsPii ? (
             <Badge tone="error" className="gap-1">
               <ShieldAlert className="size-3" />
@@ -246,9 +237,7 @@ function CollectionRow({
           ))}
         </div>
 
-        {collection.error ? (
-          <p className="text-xs text-destructive">{collection.error}</p>
-        ) : null}
+        {collection.error ? <p className="text-xs text-destructive">{collection.error}</p> : null}
       </div>
 
       {isSupportAssistDownloadable(collection) ? (
@@ -279,10 +268,7 @@ function CollectDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pending: boolean;
-  onSubmit: (request: {
-    data_selectors: SupportAssistSelectorId[];
-    filter_pii: boolean;
-  }) => void;
+  onSubmit: (request: { data_selectors: SupportAssistSelectorId[]; filter_pii: boolean }) => void;
 }) {
   const { row } = useNodeContext();
   const [selected, setSelected] = useState<SupportAssistSelectorId[]>(() => defaultSelectorIds());
@@ -302,8 +288,8 @@ function CollectDialog({
         <DialogHeader>
           <DialogTitle>Collect a SupportAssist bundle</DialogTitle>
           <DialogDescription>
-            The BMC gathers the selected data into one archive. This usually takes around 30 minutes and
-            does not reboot the node.
+            The BMC gathers the selected data into one archive. This usually takes around 30 minutes and does
+            not reboot the node.
           </DialogDescription>
         </DialogHeader>
 
@@ -340,8 +326,8 @@ function CollectDialog({
             <span>
               <span className="font-medium">Filter personally identifiable information</span>
               <span className="block text-xs text-muted-foreground">
-                Asks the BMC to scrub hostnames, addresses and user data from the bundle before it is
-                written. Leave this on unless Dell support has asked for the unfiltered collection.
+                Asks the BMC to scrub hostnames, addresses and user data from the bundle before it is written.
+                Leave this on unless Dell support has asked for the unfiltered collection.
               </span>
             </span>
           </label>
@@ -355,9 +341,7 @@ function CollectDialog({
                   {row.instanceName || row.instanceUuid ? (
                     <>
                       , which is currently running instance{' '}
-                      <span className="font-mono text-[12px]">
-                        {row.instanceName ?? row.instanceUuid}
-                      </span>
+                      <span className="font-mono text-[12px]">{row.instanceName ?? row.instanceUuid}</span>
                     </>
                   ) : null}
                   . Treat the download as customer data.

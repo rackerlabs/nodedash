@@ -18,8 +18,7 @@ limitations under the License.
 export const qk = {
   session: ['session'] as const,
   /** Per region and project: each region's Ironic negotiates its own microversion. */
-  capabilities: (region: string, projectId: string | null) =>
-    ['capabilities', region, projectId] as const,
+  capabilities: (region: string, projectId: string | null) => ['capabilities', region, projectId] as const,
   regions: ['regions'] as const,
   scopeOptions: (search: string, domainId: string | null) => ['scope-options', search, domainId] as const,
   nodes: (region: string, projectId: string | null) => ['nodes', region, projectId] as const,

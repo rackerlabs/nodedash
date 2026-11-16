@@ -37,13 +37,12 @@ export function createRng(seed: number): Rng {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const int = (maxExclusive: number) => Math.floor(next() * maxExclusive);
-  const hex = (length: number) =>
-    Array.from({ length }, () => '0123456789abcdef'[int(16)]).join('');
+  const hex = (length: number) => Array.from({ length }, () => '0123456789abcdef'[int(16)]).join('');
   return {
     next,
     int,
     hex,
-    pick: <T,>(items: readonly T[]): T => items[int(items.length)] as T,
+    pick: <T>(items: readonly T[]): T => items[int(items.length)] as T,
     bool: (probability: number) => next() < probability,
     uuid: () => `${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}`,
   };

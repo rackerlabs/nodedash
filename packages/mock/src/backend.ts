@@ -494,7 +494,8 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     locateNode(uuid: string) {
       requireAuth();
       const node = nodesByUuid.get(uuid);
-      if (!node || !node.owner) return { found: false, scope: null, projectsSearched: fixtures.projects.length };
+      if (!node || !node.owner)
+        return { found: false, scope: null, projectsSearched: fixtures.projects.length };
       // Resolves to the owning project. A lessee could also see the node, and the
       // real fan-out lands on whichever scope answers first, but the owner is the
       // project an operator wants for hardware work.
@@ -564,7 +565,10 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
         );
       }
       const withLldp = withPortLldp(inventory, fixtures.ports(node.uuid));
-      return { ...withLldp, inventory: { ...withLldp.inventory, pci_devices: fixtures.pciDevices(node.uuid) } };
+      return {
+        ...withLldp,
+        inventory: { ...withLldp.inventory, pci_devices: fixtures.pciDevices(node.uuid) },
+      };
     },
 
     getPorts(uuid: string) {
@@ -603,7 +607,11 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
       if (!eligibility.allowed) {
         throw new MockApiError(409, 'conflict', eligibility.reason ?? 'Node cannot be serviced.');
       }
-      if (!runbookMatchesNode(runbook, node.traits ?? [], { runbookTraits: capabilities.capabilities.runbookTraits })) {
+      if (
+        !runbookMatchesNode(runbook, node.traits ?? [], {
+          runbookTraits: capabilities.capabilities.runbookTraits,
+        })
+      ) {
         throw new MockApiError(
           400,
           'bad_request',
@@ -717,12 +725,8 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
         throw new MockApiError(404, 'not_found', `This node has no log service ${serviceId}.`);
       }
 
-      const filtered = query.severity
-        ? all.filter((entry) => entry.severity === query.severity)
-        : all;
-      const start = query.marker
-        ? filtered.findIndex((entry) => entry.id === query.marker) + 1
-        : 0;
+      const filtered = query.severity ? all.filter((entry) => entry.severity === query.severity) : all;
+      const start = query.marker ? filtered.findIndex((entry) => entry.id === query.marker) + 1 : 0;
       const limit = query.limit ?? 50;
       const page = filtered.slice(start, start + limit);
       return {

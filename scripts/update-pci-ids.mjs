@@ -45,7 +45,8 @@ function check(text) {
   const problems = [];
   if (!/^#\s+List of PCI IDs/m.test(text)) problems.push('missing the "List of PCI IDs" header');
   if (!versionOf(text)) problems.push('missing a Version line');
-  if (!/3-clause BSD License/.test(text)) problems.push('no longer mentions the 3-clause BSD License (see NOTICE)');
+  if (!/3-clause BSD License/.test(text))
+    problems.push('no longer mentions the 3-clause BSD License (see NOTICE)');
   // Vendor lines start in column 0 with four hex digits and two spaces.
   const vendors = text.split('\n').filter((line) => /^[0-9a-f]{4} {2}\S/.test(line)).length;
   if (vendors < 1000) problems.push(`only ${vendors} vendors, expected thousands`);
@@ -76,4 +77,6 @@ if (!pattern.test(notice)) {
 
 await writeFile(DATA, next);
 await writeFile(NOTICE, notice.replace(pattern, `$1${versionOf(next)}$2`));
-console.log(`pci.ids ${versionOf(current)} (${sha(current)}) -> ${versionOf(next)} (${sha(next)}); NOTICE updated.`);
+console.log(
+  `pci.ids ${versionOf(current)} (${sha(current)}) -> ${versionOf(next)} (${sha(next)}); NOTICE updated.`,
+);

@@ -99,7 +99,12 @@ async function fakeFetch(input: string | URL, init: RequestInit = {}): Promise<R
     }
     if (url.pathname === '/v3/auth/tokens' && method === 'DELETE') return new Response(null, { status: 204 });
     if (url.pathname === '/v3/regions') {
-      return json({ regions: [{ id: 'region-b', description: 'B' }, { id: 'region-a', description: 'A' }] });
+      return json({
+        regions: [
+          { id: 'region-b', description: 'B' },
+          { id: 'region-a', description: 'A' },
+        ],
+      });
     }
     if (url.pathname === '/v3/auth/domains') return json({ error: { code: 403 } }, { status: 403 });
     if (url.pathname === '/v3/auth/projects') {
@@ -278,7 +283,10 @@ describe('encrypted session cookie', () => {
     await signIn(app, jar);
 
     const regions = await call(app, jar, 'GET', '/api/regions');
-    expect(regions.json().regions.map((region: { id: string }) => region.id)).toEqual(['region-a', 'region-b']);
+    expect(regions.json().regions.map((region: { id: string }) => region.id)).toEqual([
+      'region-a',
+      'region-b',
+    ]);
 
     expect((await call(app, jar, 'PUT', '/api/scope', { projectId: 'p1' })).statusCode).toBe(200);
 
@@ -412,7 +420,9 @@ describe('ironicEndpoints', () => {
   });
 
   it('falls back to the older region field when region_id is missing', () => {
-    const legacy = [{ type: 'baremetal', endpoints: [{ interface: 'public', region: 'old', url: IRONIC_A }] }];
+    const legacy = [
+      { type: 'baremetal', endpoints: [{ interface: 'public', region: 'old', url: IRONIC_A }] },
+    ];
     expect(ironicEndpoints(legacy, 'public')).toEqual({ old: IRONIC_A });
   });
 
@@ -459,7 +469,13 @@ describe('node extra fields', () => {
 
   it('refuses a field that is not configured without calling Ironic', async () => {
     const { app, jar } = await signedIn();
-    for (const values of [{ driver: 'x' }, { rack: 'A1', owner: 'x' }, { 'rack/../driver': 'x' }, {}, 'rack']) {
+    for (const values of [
+      { driver: 'x' },
+      { rack: 'A1', owner: 'x' },
+      { 'rack/../driver': 'x' },
+      {},
+      'rack',
+    ]) {
       const response = await call(app, jar, 'PATCH', '/api/nodes/region-a/node-1/extra', { values });
       expect(response.statusCode).toBe(400);
       expect(response.json().error.code).toBe('bad_request');
@@ -469,7 +485,9 @@ describe('node extra fields', () => {
 
   it('refuses a bad value, and a request without the CSRF token', async () => {
     const { app, jar } = await signedIn();
-    const empty = await call(app, jar, 'PATCH', '/api/nodes/region-a/node-1/extra', { values: { rack: '  ' } });
+    const empty = await call(app, jar, 'PATCH', '/api/nodes/region-a/node-1/extra', {
+      values: { rack: '  ' },
+    });
     expect(empty.statusCode).toBe(400);
 
     const response = await app.inject({

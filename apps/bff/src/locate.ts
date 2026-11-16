@@ -72,9 +72,13 @@ export async function locateNode(
       const scoped = await keystone.scopedToken(unscopedToken, project.id);
       const endpoint = scoped.ironicEndpoints[region];
       if (!endpoint) return null;
-      const result = await ironic.request({ token: scoped.token, endpoint }, `/v1/nodes/${encodeURIComponent(uuid)}`, {
-        query: { fields: 'uuid' },
-      });
+      const result = await ironic.request(
+        { token: scoped.token, endpoint },
+        `/v1/nodes/${encodeURIComponent(uuid)}`,
+        {
+          query: { fields: 'uuid' },
+        },
+      );
       if (result.status !== 200) return null;
       return {
         scoped,

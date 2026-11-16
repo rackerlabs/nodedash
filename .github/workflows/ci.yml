@@ -40,6 +40,11 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci
+      # Runs .pre-commit-config.yaml over every file, for commits made without
+      # `prek install`. Needs node_modules, which hold the pinned Prettier.
+      - uses: j178/prek-action@v3.1.0
+        with:
+          prek-version: 0.5.9
       - run: npm run typecheck
       - run: npm test
       - run: npx playwright install --with-deps chromium

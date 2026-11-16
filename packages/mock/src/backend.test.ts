@@ -44,7 +44,9 @@ describe('mock backend: authentication and scope', () => {
 
     expect(() => backend.assertRegion('lab-2')).not.toThrow();
     expect(backend.getSession().scope?.projectId).toBe(backend.fixtures.projects[0]!.id);
-    expect(() => backend.assertRegion('nowhere')).toThrowError(/no bare metal \(Ironic\) endpoint in region nowhere/);
+    expect(() => backend.assertRegion('nowhere')).toThrowError(
+      /no bare metal \(Ironic\) endpoint in region nowhere/,
+    );
   });
 
   it('remembers the last scope after it is cleared, the way a session cookie would', () => {
@@ -273,9 +275,7 @@ describe('mock fixtures', () => {
       const hardwareTrait = node.traits?.[0] ?? '';
       const vendor = expectedVendor[hardwareTrait];
       expect(vendor, `unexpected hardware trait ${hardwareTrait}`).toBeDefined();
-      expect(backend.fixtures.inventory.get(node.uuid)!.inventory.system_vendor?.manufacturer).toBe(
-        vendor,
-      );
+      expect(backend.fixtures.inventory.get(node.uuid)!.inventory.system_vendor?.manufacturer).toBe(vendor);
       const firmware = backend.fixtures.firmware.get(node.uuid);
       if (firmware) expect(firmware[0]!.vendor).toBe(vendor);
     }
@@ -412,9 +412,7 @@ describe('mock backend: SupportAssist', () => {
       .get(node.uuid)!
       .find((collection) => collection.state === 'expired');
     if (expired) {
-      expect(() => backend.downloadSupportAssist(node.uuid, expired.id)).toThrowError(
-        /retention window/,
-      );
+      expect(() => backend.downloadSupportAssist(node.uuid, expired.id)).toThrowError(/retention window/);
     }
   });
 
@@ -553,9 +551,7 @@ describe('mock backend: diagnostics', () => {
 
   it('refuses a log service the node does not have', () => {
     const { backend, nodes } = setupWithClock();
-    expect(() => backend.getLogEntries(nodes[0]!.uuid, 'NoSuchLog', {})).toThrowError(
-      /no log service/,
-    );
+    expect(() => backend.getLogEntries(nodes[0]!.uuid, 'NoSuchLog', {})).toThrowError(/no log service/);
   });
 });
 
@@ -647,9 +643,7 @@ describe('mock backend: domains, ownership and leases', () => {
   it('shows a tenant exactly the nodes leased to it, as Ironic does', () => {
     const { backend } = setupWithClock();
     const leasedNode = backend.fixtures.nodes.find((node) => node.lessee)!;
-    const tenant = backend.fixtures.projects.find(
-      (project) => project.id === leasedNode.lessee,
-    )!;
+    const tenant = backend.fixtures.projects.find((project) => project.id === leasedNode.lessee)!;
 
     backend.setScope(tenant.id);
     const visible = backend.listNodes({ limit: 5000 }).nodes;
@@ -665,9 +659,7 @@ describe('mock backend: domains, ownership and leases', () => {
     const leasedNode = backend.fixtures.nodes.find((node) => node.lessee)!;
     const otherTenant = backend.fixtures.projects.find(
       (project) =>
-        project.name !== 'baremetal' &&
-        project.name !== 'netdev' &&
-        project.id !== leasedNode.lessee,
+        project.name !== 'baremetal' && project.name !== 'netdev' && project.id !== leasedNode.lessee,
     )!;
 
     backend.setScope(otherTenant.id);

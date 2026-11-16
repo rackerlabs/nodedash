@@ -125,8 +125,7 @@ export function NodeOverviewPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No traits set. Runbooks are matched to nodes by trait, so a node without traits cannot run
-              any.
+              No traits set. Runbooks are matched to nodes by trait, so a node without traits cannot run any.
             </p>
           )}
         </CardContent>

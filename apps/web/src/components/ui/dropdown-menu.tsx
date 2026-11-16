@@ -33,7 +33,11 @@ export function DropdownMenuContent({
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
     <DropdownMenuPrimitive.Portal>
-      <DropdownMenuPrimitive.Content sideOffset={sideOffset} className={cn(menuSurface, className)} {...props} />
+      <DropdownMenuPrimitive.Content
+        sideOffset={sideOffset}
+        className={cn(menuSurface, className)}
+        {...props}
+      />
     </DropdownMenuPrimitive.Portal>
   );
 }
@@ -102,5 +106,7 @@ export function DropdownMenuSeparator({
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
-  return <DropdownMenuPrimitive.Separator className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />;
+  return (
+    <DropdownMenuPrimitive.Separator className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />
+  );
 }

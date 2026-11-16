@@ -26,6 +26,7 @@ region's Ironic, found in the Keystone service catalog, with the user's own toke
 npm ci
 npm run dev:mock    # SPA with the mock backend, no deployment needed
 npm run dev         # BFF + Vite against a real region (reads apps/bff/.env)
+npm run format      # Prettier, for TS/TSX/JS/CSS; `prek install` sets up a hook that does this on staged files
 npm run typecheck
 npm test            # Vitest
 npm run test:e2e    # Playwright, mock backend

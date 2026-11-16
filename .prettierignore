@@ -1,0 +1,13 @@
+node_modules
+dist
+package-lock.json
+apps/web/public-mock/mockServiceWorker.js
+apps/web/src/data/pci.ids
+charts
+playwright-report
+test-results
+*.md
+*.json
+*.html
+*.yml
+*.yaml
