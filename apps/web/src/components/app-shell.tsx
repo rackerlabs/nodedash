@@ -133,7 +133,9 @@ export function AppShell() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2">
                   <UserRound className="size-4" />
-                  <span className="hidden max-w-40 truncate md:inline">{user?.displayName ?? user?.name}</span>
+                  <span className="hidden max-w-40 truncate md:inline">
+                    {user?.displayName ?? user?.name}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
@@ -166,7 +168,11 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <ScopePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelected={() => navigate(paths.nodes)} />
+      <ScopePickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelected={() => navigate(paths.nodes)}
+      />
     </div>
   );
 }

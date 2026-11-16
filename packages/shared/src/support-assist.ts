@@ -102,10 +102,7 @@ export function selectorById(id: string) {
 }
 
 /** True when this request would pull data that can contain customer information. */
-export function requestTouchesPii(
-  selectors: readonly string[],
-  options: { filterPii: boolean },
-): boolean {
+export function requestTouchesPii(selectors: readonly string[], options: { filterPii: boolean }): boolean {
   if (options.filterPii) return false;
   return selectors.some((id) => selectorById(id)?.containsPii === true);
 }
@@ -127,9 +124,7 @@ export function isSupportAssistActive(state: string | null | undefined): boolean
   return (SUPPORT_ASSIST_ACTIVE_STATES as readonly string[]).includes(state ?? '');
 }
 
-export function isSupportAssistDownloadable(
-  collection: Pick<SupportAssistCollection, 'state'>,
-): boolean {
+export function isSupportAssistDownloadable(collection: Pick<SupportAssistCollection, 'state'>): boolean {
   return collection.state === 'available';
 }
 

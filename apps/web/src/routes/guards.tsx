@@ -33,7 +33,13 @@ export function RequireAuth() {
   if (session.isPending) return <FullPageSpinner label="Checking your session…" />;
 
   if (session.isError && !isUnauthenticated(session.error)) {
-    return <ErrorPanel title="Could not load your session" error={session.error} onRetry={() => void session.refetch()} />;
+    return (
+      <ErrorPanel
+        title="Could not load your session"
+        error={session.error}
+        onRetry={() => void session.refetch()}
+      />
+    );
   }
 
   if (!session.data?.authenticated) {
@@ -62,7 +68,13 @@ export function RequireRegion() {
   }, [known, region]);
 
   if (regions.isError) {
-    return <ErrorPanel title="Could not list regions" error={regions.error} onRetry={() => void regions.refetch()} />;
+    return (
+      <ErrorPanel
+        title="Could not list regions"
+        error={regions.error}
+        onRetry={() => void regions.refetch()}
+      />
+    );
   }
   if (regions.isPending) return <FullPageSpinner label="Loading regions…" />;
   if (!known) {
@@ -89,7 +101,13 @@ export function RegionEntry() {
 
   const list = regions.data?.regions ?? [];
   if (regions.isError) {
-    return <ErrorPanel title="Could not list regions" error={regions.error} onRetry={() => void regions.refetch()} />;
+    return (
+      <ErrorPanel
+        title="Could not list regions"
+        error={regions.error}
+        onRetry={() => void regions.refetch()}
+      />
+    );
   }
   if (regions.isPending) return <FullPageSpinner label="Loading regions…" />;
   if (list.length === 0) {

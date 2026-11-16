@@ -60,16 +60,13 @@ export function registerDiagnosticsRoutes(
     return ironic.json(target, nodePath(request.params.uuid, '/logs'));
   });
 
-  app.get<{ Params: NodeParams & { id: string } }>(
-    '/api/nodes/:region/:uuid/logs/:id',
-    async (request) => {
-      const target = await ironicTarget(keystone, request);
-      return ironic.json(
-        target,
-        nodePath(request.params.uuid, `/logs/${encodeURIComponent(request.params.id)}`),
-      );
-    },
-  );
+  app.get<{ Params: NodeParams & { id: string } }>('/api/nodes/:region/:uuid/logs/:id', async (request) => {
+    const target = await ironicTarget(keystone, request);
+    return ironic.json(
+      target,
+      nodePath(request.params.uuid, `/logs/${encodeURIComponent(request.params.id)}`),
+    );
+  });
 
   app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/health', async (request) => {
     const target = await ironicTarget(keystone, request);
@@ -88,10 +85,7 @@ export function registerDiagnosticsRoutes(
     const target = await ironicTarget(keystone, request);
     return ironic.json(
       target,
-      nodePath(
-        request.params.uuid,
-        `/log_services/${encodeURIComponent(request.params.serviceId)}/entries`,
-      ),
+      nodePath(request.params.uuid, `/log_services/${encodeURIComponent(request.params.serviceId)}/entries`),
       {
         query: {
           limit: request.query.limit,

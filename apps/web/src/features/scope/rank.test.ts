@@ -61,9 +61,7 @@ describe('rankProjects', () => {
 
   it('is case insensitive and trims the query', () => {
     for (const query of ['GPU-POOL', '  gpu-pool  ', 'Gpu-Pool']) {
-      expect(rankProjects(projects, query, 10).map((entry) => entry.project.name)).toEqual([
-        'gpu-pool-prod',
-      ]);
+      expect(rankProjects(projects, query, 10).map((entry) => entry.project.name)).toEqual(['gpu-pool-prod']);
     }
   });
 

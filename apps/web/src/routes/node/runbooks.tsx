@@ -15,12 +15,7 @@ limitations under the License.
 */
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import {
-  canRunServiceSteps,
-  nodeDisplayName,
-  runbookMatchesNode,
-  type Runbook,
-} from '@nodedash/shared';
+import { canRunServiceSteps, nodeDisplayName, runbookMatchesNode, type Runbook } from '@nodedash/shared';
 import { BookOpen, Play, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -77,7 +72,9 @@ export function NodeRunbooksPage() {
 
   if (query.isPending) return <Skeleton className="h-64 w-full" />;
   if (query.isError) {
-    return <ErrorPanel title="Could not load runbooks" error={query.error} onRetry={() => void query.refetch()} />;
+    return (
+      <ErrorPanel title="Could not load runbooks" error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   return (
@@ -92,9 +89,8 @@ export function NodeRunbooksPage() {
 
         {servicing ? (
           <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-            <Spinner className="size-4" />
-            A service operation is running on this node. Steps are applied in order and the node returns to{' '}
-            <span className="font-mono">active</span> when they finish.
+            <Spinner className="size-4" />A service operation is running on this node. Steps are applied in
+            order and the node returns to <span className="font-mono">active</span> when they finish.
           </div>
         ) : !eligibility.allowed ? (
           <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
@@ -177,7 +173,11 @@ function RunbookCard({
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {(runbook.traits ?? [runbook.name]).map((trait) => (
-            <Badge key={trait} tone={nodeTraits.includes(trait) ? 'active' : 'outline'} className="font-mono text-[10px]">
+            <Badge
+              key={trait}
+              tone={nodeTraits.includes(trait) ? 'active' : 'outline'}
+              className="font-mono text-[10px]"
+            >
               {trait}
             </Badge>
           ))}

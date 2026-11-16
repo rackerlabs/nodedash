@@ -61,9 +61,9 @@ describe('safeStorageUrl', () => {
   });
 
   it('matches the allowlist on host, so a lookalike path cannot slip through', () => {
-    expect(() =>
-      safeStorageUrl('https://evil.example/objects.example.invalid/bundle', pinned),
-    ).toThrowError(/not in SUPPORT_ASSIST_STORAGE_HOSTS/);
+    expect(() => safeStorageUrl('https://evil.example/objects.example.invalid/bundle', pinned)).toThrowError(
+      /not in SUPPORT_ASSIST_STORAGE_HOSTS/,
+    );
     // Port is part of the host: a different port is a different endpoint.
     expect(() => safeStorageUrl('https://swift.example.invalid:9000/x', pinned)).toThrowError(
       /not in SUPPORT_ASSIST_STORAGE_HOSTS/,

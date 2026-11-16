@@ -47,7 +47,10 @@ describe('nodesToCsv', () => {
   });
 
   it('quotes commas, quotes and newlines', () => {
-    const csv = nodesToCsv([row({ maintenance: true, maintenanceReason: 'swap "PSU", then\nretest' })], columns);
+    const csv = nodesToCsv(
+      [row({ maintenance: true, maintenanceReason: 'swap "PSU", then\nretest' })],
+      columns,
+    );
     expect(csv).toContain('true,"swap ""PSU"", then\nretest"');
   });
 

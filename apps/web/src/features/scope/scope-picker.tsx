@@ -95,7 +95,10 @@ function ScopePicker({ onSelected }: { onSelected?: (scope: Scope) => void }) {
 
   const domains = options.data?.domains ?? [];
   const projects = options.data?.projects ?? [];
-  const ranked = useMemo(() => rankProjects(projects, debouncedQuery, VISIBLE_LIMIT), [projects, debouncedQuery]);
+  const ranked = useMemo(
+    () => rankProjects(projects, debouncedQuery, VISIBLE_LIMIT),
+    [projects, debouncedQuery],
+  );
   const hiddenCount = Math.max(0, projects.length - ranked.length);
 
   const domainName = (project: Project) =>

@@ -57,7 +57,10 @@ export function rememberScopedToken(
   region: string,
 ): IronicTarget {
   cacheScopedToken(request, scoped);
-  return { token: scoped.token, endpoint: ironicEndpointFor(scoped.ironicEndpoints, scoped.projectName, region) };
+  return {
+    token: scoped.token,
+    endpoint: ironicEndpointFor(scoped.ironicEndpoints, scoped.projectName, region),
+  };
 }
 
 /**

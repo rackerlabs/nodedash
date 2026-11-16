@@ -113,13 +113,7 @@ export function NodeLayout() {
 
   if (phase !== 'ready' || !node.data) {
     return (
-      <FullPageSpinner
-        label={
-          isLocating
-            ? 'Looking for this node across your projects…'
-            : 'Loading node…'
-        }
-      />
+      <FullPageSpinner label={isLocating ? 'Looking for this node across your projects…' : 'Loading node…'} />
     );
   }
 
@@ -145,9 +139,7 @@ export function NodeLayout() {
             <div className="flex flex-wrap items-center gap-2">
               <ProvisionStateBadge state={row.provisionState} target={row.targetProvisionState} />
               <PowerStateBadge state={row.powerState} target={row.targetPowerState} />
-              {row.maintenance ? (
-                <MaintenanceBadge maintenance reason={row.maintenanceReason} />
-              ) : null}
+              {row.maintenance ? <MaintenanceBadge maintenance reason={row.maintenanceReason} /> : null}
             </div>
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -198,8 +190,7 @@ export function NodeLayout() {
           {row.targetProvisionState && row.provisionState !== row.targetProvisionState ? (
             <Banner tone="warning" icon={<Spinner className="size-4" />}>
               Ironic is moving this node from <span className="font-mono">{row.provisionState}</span> to{' '}
-              <span className="font-mono">{row.targetProvisionState}</span>. This page is polling for
-              updates.
+              <span className="font-mono">{row.targetProvisionState}</span>. This page is polling for updates.
             </Banner>
           ) : null}
 

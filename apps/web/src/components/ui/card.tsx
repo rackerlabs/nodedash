@@ -43,5 +43,7 @@ export function CardContent({ className, ...props }: React.ComponentProps<'div'>
 }
 
 export function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div className={cn('flex items-center gap-2 border-t border-border px-4 py-3', className)} {...props} />;
+  return (
+    <div className={cn('flex items-center gap-2 border-t border-border px-4 py-3', className)} {...props} />
+  );
 }

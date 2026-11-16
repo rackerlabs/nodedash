@@ -22,16 +22,16 @@ import { cn } from '@/lib/utils';
 export function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
-      className={cn('flex h-full w-full flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground', className)}
+      className={cn(
+        'flex h-full w-full flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground',
+        className,
+      )}
       {...props}
     />
   );
 }
 
-export function CommandInput({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+export function CommandInput({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div className="flex items-center gap-2 border-b border-border px-3">
       <Search className="size-4 shrink-0 text-muted-foreground" />
@@ -59,10 +59,7 @@ export function CommandEmpty(props: React.ComponentProps<typeof CommandPrimitive
   return <CommandPrimitive.Empty className="py-8 text-center text-sm text-muted-foreground" {...props} />;
 }
 
-export function CommandGroup({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Group>) {
+export function CommandGroup({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Group>) {
   return (
     <CommandPrimitive.Group
       className={cn(

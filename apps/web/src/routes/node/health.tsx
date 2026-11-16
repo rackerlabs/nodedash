@@ -280,7 +280,8 @@ function EventLogs({ uuid }: { uuid: string }) {
 
   const entries = useQuery({
     queryKey: qk.logEntries(region, uuid, active ?? '', severity === 'All' ? null : severity),
-    queryFn: () => api.logEntries(region, uuid, active!, { severity: severity === 'All' ? undefined : severity }),
+    queryFn: () =>
+      api.logEntries(region, uuid, active!, { severity: severity === 'All' ? undefined : severity }),
     enabled: active !== null,
     staleTime: 60_000,
   });
@@ -330,9 +331,7 @@ function EventLogs({ uuid }: { uuid: string }) {
             />
           </div>
         </div>
-        {service?.description ? (
-          <p className="text-xs text-muted-foreground">{service.description}</p>
-        ) : null}
+        {service?.description ? <p className="text-xs text-muted-foreground">{service.description}</p> : null}
       </CardHeader>
       <CardContent>
         {entries.isPending ? (

@@ -39,7 +39,10 @@ async function signIn(page: Page, scenario = 'default') {
 async function chooseProject(page: Page, name = PROJECT) {
   const dialog = page.getByRole('dialog', { name: 'Select a project' });
   await dialog.getByRole('combobox').fill(name);
-  await dialog.getByRole('option', { name: new RegExp(`^${name}\\b`) }).first().click();
+  await dialog
+    .getByRole('option', { name: new RegExp(`^${name}\\b`) })
+    .first()
+    .click();
   await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible();
 }
 
@@ -63,7 +66,9 @@ async function openNodeMatching(page: Page, search: string): Promise<string> {
 }
 
 test.describe('regions', () => {
-  test('asks for a region when there is more than one, and keeps the project across a switch', async ({ page }) => {
+  test('asks for a region when there is more than one, and keeps the project across a switch', async ({
+    page,
+  }) => {
     await page.goto('/nodes?scenario=multi-region');
     await page.getByRole('button', { name: /Continue with Corp SSO/ }).click();
 
@@ -191,7 +196,10 @@ test.describe('fleet view', () => {
       const stream = await file.createReadStream();
       let text = '';
       for await (const chunk of stream) text += chunk;
-      const [header, ...rows] = text.replace(/^\uFEFF/, '').trimEnd().split('\r\n');
+      const [header, ...rows] = text
+        .replace(/^\uFEFF/, '')
+        .trimEnd()
+        .split('\r\n');
       return { filename: file.suggestedFilename(), header, rows };
     }
 
@@ -449,9 +457,7 @@ test.describe('SupportAssist', () => {
     await expect(downloads).toHaveCount(before + 1);
   });
 
-  test('requires an explicit acknowledgement before collecting unfiltered OS data', async ({
-    page,
-  }) => {
+  test('requires an explicit acknowledgement before collecting unfiltered OS data', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
     await page.goto(`/nodes/lab-1/${await idracNodeUuid(page)}/support-assist`);

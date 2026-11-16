@@ -47,11 +47,7 @@ export function buildWebssoUrl(config: Config, idpId: string | undefined): strin
     : `${config.keystoneUrl}/v3/auth/OS-FEDERATION/websso/${encodeURIComponent(protocol)}?origin=${origin}`;
 }
 
-export function registerAuthRoutes(
-  app: FastifyInstance,
-  config: Config,
-  keystone: KeystoneClient,
-): void {
+export function registerAuthRoutes(app: FastifyInstance, config: Config, keystone: KeystoneClient): void {
   app.get('/api/session', async (request, reply) => {
     const view = sessionView(request, config);
     // Hand out a CSRF token alongside the session so the SPA can mutate straight away.

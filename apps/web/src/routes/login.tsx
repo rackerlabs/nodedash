@@ -53,8 +53,8 @@ export function LoginPage() {
               Sign in with federated identity
             </CardTitle>
             <CardDescription>
-              Authentication goes through Keystone WebSSO. Your token is kept in an encrypted cookie that
-              this page cannot read.
+              Authentication goes through Keystone WebSSO. Your token is kept in an encrypted cookie that this
+              page cannot read.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -80,9 +80,7 @@ export function LoginPage() {
               </p>
             ) : null}
 
-            {login.isError ? (
-              <p className="text-sm text-destructive">{errorMessage(login.error)}</p>
-            ) : null}
+            {login.isError ? <p className="text-sm text-destructive">{errorMessage(login.error)}</p> : null}
 
             {IS_MOCK ? (
               <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">

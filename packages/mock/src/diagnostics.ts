@@ -229,17 +229,116 @@ interface SensorSpec {
 }
 
 const SENSOR_SPECS: SensorSpec[] = [
-  { name: 'Inlet Temp', type: 'Temperature', units: 'Cel', nominal: 22, spread: 6, warning: 38, critical: 43, physical_context: 'Intake' },
-  { name: 'Exhaust Temp', type: 'Temperature', units: 'Cel', nominal: 38, spread: 8, warning: 70, critical: 75, physical_context: 'Exhaust' },
-  { name: 'CPU1 Temp', type: 'Temperature', units: 'Cel', nominal: 52, spread: 14, warning: 88, critical: 95, physical_context: 'CPU' },
-  { name: 'CPU2 Temp', type: 'Temperature', units: 'Cel', nominal: 51, spread: 14, warning: 88, critical: 95, physical_context: 'CPU' },
-  { name: 'Fan1A', type: 'Fan', units: 'RPM', nominal: 8400, spread: 1800, warning: 2000, critical: 1000, physical_context: 'Chassis' },
-  { name: 'Fan2A', type: 'Fan', units: 'RPM', nominal: 8500, spread: 1800, warning: 2000, critical: 1000, physical_context: 'Chassis' },
-  { name: 'Fan3A', type: 'Fan', units: 'RPM', nominal: 8300, spread: 1800, warning: 2000, critical: 1000, physical_context: 'Chassis' },
-  { name: 'System Board 3.3V', type: 'Voltage', units: 'V', nominal: 3.3, spread: 0.1, warning: 3.6, critical: 3.8, physical_context: 'SystemBoard' },
-  { name: 'System Board 12V', type: 'Voltage', units: 'V', nominal: 12, spread: 0.3, warning: 13, critical: 13.5, physical_context: 'SystemBoard' },
-  { name: 'PSU1 Current', type: 'Current', units: 'A', nominal: 3.4, spread: 1.2, warning: 12, critical: 14, physical_context: 'PowerSupply' },
-  { name: 'System Power', type: 'Power', units: 'W', nominal: 410, spread: 160, warning: 1100, critical: 1300, physical_context: 'Chassis' },
+  {
+    name: 'Inlet Temp',
+    type: 'Temperature',
+    units: 'Cel',
+    nominal: 22,
+    spread: 6,
+    warning: 38,
+    critical: 43,
+    physical_context: 'Intake',
+  },
+  {
+    name: 'Exhaust Temp',
+    type: 'Temperature',
+    units: 'Cel',
+    nominal: 38,
+    spread: 8,
+    warning: 70,
+    critical: 75,
+    physical_context: 'Exhaust',
+  },
+  {
+    name: 'CPU1 Temp',
+    type: 'Temperature',
+    units: 'Cel',
+    nominal: 52,
+    spread: 14,
+    warning: 88,
+    critical: 95,
+    physical_context: 'CPU',
+  },
+  {
+    name: 'CPU2 Temp',
+    type: 'Temperature',
+    units: 'Cel',
+    nominal: 51,
+    spread: 14,
+    warning: 88,
+    critical: 95,
+    physical_context: 'CPU',
+  },
+  {
+    name: 'Fan1A',
+    type: 'Fan',
+    units: 'RPM',
+    nominal: 8400,
+    spread: 1800,
+    warning: 2000,
+    critical: 1000,
+    physical_context: 'Chassis',
+  },
+  {
+    name: 'Fan2A',
+    type: 'Fan',
+    units: 'RPM',
+    nominal: 8500,
+    spread: 1800,
+    warning: 2000,
+    critical: 1000,
+    physical_context: 'Chassis',
+  },
+  {
+    name: 'Fan3A',
+    type: 'Fan',
+    units: 'RPM',
+    nominal: 8300,
+    spread: 1800,
+    warning: 2000,
+    critical: 1000,
+    physical_context: 'Chassis',
+  },
+  {
+    name: 'System Board 3.3V',
+    type: 'Voltage',
+    units: 'V',
+    nominal: 3.3,
+    spread: 0.1,
+    warning: 3.6,
+    critical: 3.8,
+    physical_context: 'SystemBoard',
+  },
+  {
+    name: 'System Board 12V',
+    type: 'Voltage',
+    units: 'V',
+    nominal: 12,
+    spread: 0.3,
+    warning: 13,
+    critical: 13.5,
+    physical_context: 'SystemBoard',
+  },
+  {
+    name: 'PSU1 Current',
+    type: 'Current',
+    units: 'A',
+    nominal: 3.4,
+    spread: 1.2,
+    warning: 12,
+    critical: 14,
+    physical_context: 'PowerSupply',
+  },
+  {
+    name: 'System Power',
+    type: 'Power',
+    units: 'W',
+    nominal: 410,
+    spread: 160,
+    warning: 1100,
+    critical: 1300,
+    physical_context: 'Chassis',
+  },
 ];
 
 function buildHealth(rng: Rng, node: IronicNode, anchor: number): NodeHealth {
@@ -334,23 +433,66 @@ function buildHealth(rng: Rng, node: IronicNode, anchor: number): NodeHealth {
 
 const SEL_MESSAGES: Array<{ severity: string; message: string; sensor: string; id: string }> = [
   { severity: 'OK', message: 'Power supply redundancy is restored.', sensor: 'PowerSupply', id: 'PSU0002' },
-  { severity: 'OK', message: 'The chassis is closed while the power is on.', sensor: 'Intrusion', id: 'CPU0001' },
-  { severity: 'Warning', message: 'The system inlet temperature is above the upper warning threshold.', sensor: 'Temperature', id: 'TMP0118' },
-  { severity: 'Warning', message: 'Fan 3A RPM is below the lower warning threshold.', sensor: 'Fan', id: 'FAN0001' },
-  { severity: 'Warning', message: 'Correctable memory error rate exceeded for DIMM A4.', sensor: 'Memory', id: 'MEM0701' },
-  { severity: 'Critical', message: 'Fan 3A RPM is below the lower critical threshold.', sensor: 'Fan', id: 'FAN0002' },
-  { severity: 'Critical', message: 'The power supply in slot 2 has failed.', sensor: 'PowerSupply', id: 'PSU0001' },
-  { severity: 'Critical', message: 'Multi-bit memory error detected on DIMM B2.', sensor: 'Memory', id: 'MEM0702' },
+  {
+    severity: 'OK',
+    message: 'The chassis is closed while the power is on.',
+    sensor: 'Intrusion',
+    id: 'CPU0001',
+  },
+  {
+    severity: 'Warning',
+    message: 'The system inlet temperature is above the upper warning threshold.',
+    sensor: 'Temperature',
+    id: 'TMP0118',
+  },
+  {
+    severity: 'Warning',
+    message: 'Fan 3A RPM is below the lower warning threshold.',
+    sensor: 'Fan',
+    id: 'FAN0001',
+  },
+  {
+    severity: 'Warning',
+    message: 'Correctable memory error rate exceeded for DIMM A4.',
+    sensor: 'Memory',
+    id: 'MEM0701',
+  },
+  {
+    severity: 'Critical',
+    message: 'Fan 3A RPM is below the lower critical threshold.',
+    sensor: 'Fan',
+    id: 'FAN0002',
+  },
+  {
+    severity: 'Critical',
+    message: 'The power supply in slot 2 has failed.',
+    sensor: 'PowerSupply',
+    id: 'PSU0001',
+  },
+  {
+    severity: 'Critical',
+    message: 'Multi-bit memory error detected on DIMM B2.',
+    sensor: 'Memory',
+    id: 'MEM0702',
+  },
 ];
 
 const LC_MESSAGES: Array<{ severity: string; message: string; id: string }> = [
-  { severity: 'OK', message: 'Successfully logged in using root, from 192.0.2.11 and REDFISH.', id: 'USR0030' },
+  {
+    severity: 'OK',
+    message: 'Successfully logged in using root, from 192.0.2.11 and REDFISH.',
+    id: 'USR0030',
+  },
   { severity: 'OK', message: 'The iDRAC firmware version was updated to 7.10.30.00.', id: 'RED001' },
   { severity: 'OK', message: 'Job JID_874219556301 completed successfully.', id: 'JCP037' },
   { severity: 'OK', message: 'The BIOS configuration job was created.', id: 'SYS057' },
   { severity: 'Warning', message: 'The SupportAssist collection was cancelled by the user.', id: 'SRV088' },
   { severity: 'Warning', message: 'Unable to reach the NTP server 192.0.2.1.', id: 'NIC0700' },
-  { severity: 'Critical', message: 'Job JID_874219556301 failed: OS Collector could not reach the host agent.', id: 'JCP027' },
+  {
+    severity: 'Critical',
+    message: 'Job JID_874219556301 failed: OS Collector could not reach the host agent.',
+    id: 'JCP027',
+  },
 ];
 
 function buildLogServices(
@@ -360,7 +502,11 @@ function buildLogServices(
 ): { services: LogService[]; entries: Map<string, LogEntry[]> } {
   const entries = new Map<string, LogEntry[]>();
 
-  function fill(id: string, count: number, pool: Array<{ severity: string; message: string; id: string; sensor?: string }>) {
+  function fill(
+    id: string,
+    count: number,
+    pool: Array<{ severity: string; message: string; id: string; sensor?: string }>,
+  ) {
     const list: LogEntry[] = [];
     for (let index = 0; index < count; index += 1) {
       const template = rng.pick(pool);
