@@ -80,6 +80,15 @@ describe('parsePciIds / lookupPci', () => {
     });
   });
 
+  it('reads a line padded with a long run of spaces in linear time', () => {
+    const padded = `1234${' '.repeat(50_000)}Example Vendor\n9999${' '.repeat(50_000)}\n`;
+    const started = Date.now();
+    const parsed = parsePciIds(padded);
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(parsed.get('1234')?.name).toBe('Example Vendor');
+    expect(parsed.has('9999')).toBe(false);
+  });
+
   it('does not read the class section as vendors', () => {
     expect(ids.size).toBe(2);
   });
