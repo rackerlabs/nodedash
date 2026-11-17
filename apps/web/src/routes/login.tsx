@@ -25,11 +25,17 @@ import { errorMessage } from '@/lib/api/client';
 import { IS_MOCK } from '@/lib/env';
 import { FullPageSpinner } from './status';
 
+const LOGIN_ERRORS: Record<string, string> = {
+  login_expired: 'Your sign-in expired or was not started from this page. Please try again.',
+  login_failed: 'Sign-in could not be completed. Please try again.',
+};
+
 export function LoginPage() {
   const session = useSession();
   const login = useLogin();
   const [params] = useSearchParams();
   const next = params.get('next') ?? '/nodes';
+  const loginError = LOGIN_ERRORS[params.get('error') ?? ''];
   const branding = useBranding();
 
   if (session.isPending) return <FullPageSpinner label="Checking your session…" />;
@@ -77,6 +83,12 @@ export function LoginPage() {
             {providers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No identity providers are configured. Set the WebSSO protocol and IdP list on the server.
+              </p>
+            ) : null}
+
+            {loginError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {loginError}
               </p>
             ) : null}
 

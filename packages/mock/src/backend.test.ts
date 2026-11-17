@@ -36,6 +36,12 @@ describe('mock backend: authentication and scope', () => {
     expect(() => backend.listNodes({})).toThrowError(/Select a domain and project/);
   });
 
+  it('refuses sign-in when the scenario has Keystone reject the token', () => {
+    const backend = createMockBackend({ scenario: { ...findScenario('sign-in-fails'), latencyMs: 0 } });
+    expect(() => backend.login('corp-sso')).toThrowError(MockApiError);
+    expect(backend.getSession().authenticated).toBe(false);
+  });
+
   it('keeps the selected project across regions and refuses one with no Ironic', () => {
     const backend = createMockBackend({ scenario: { ...findScenario('multi-region'), latencyMs: 0 } });
     backend.login('corp-sso');

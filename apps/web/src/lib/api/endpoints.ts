@@ -42,7 +42,7 @@ import {
   type SupportAssistStartRequest,
 } from '@nodedash/shared';
 import { IS_MOCK } from '@/lib/env';
-import { request } from './client';
+import { ApiRequestError, request } from './client';
 
 const enc = encodeURIComponent;
 
@@ -56,7 +56,16 @@ export const api = {
    */
   async beginLogin(idp: string, nextPath: string): Promise<void> {
     if (IS_MOCK) {
-      await request('/auth/dev-login', { method: 'POST', body: { idp } });
+      try {
+        await request('/auth/dev-login', { method: 'POST', body: { idp } });
+      } catch (error) {
+        if (!(error instanceof ApiRequestError)) throw error;
+        // Where the BFF sends the browser when Keystone rejects the callback token.
+        const failed = new URL('/login', window.location.origin);
+        failed.searchParams.set('error', 'login_failed');
+        failed.searchParams.set('next', nextPath);
+        window.location.assign(failed.toString());
+      }
       return;
     }
     const url = new URL('/api/auth/login', window.location.origin);
