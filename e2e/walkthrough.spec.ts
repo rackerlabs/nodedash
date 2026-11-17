@@ -201,6 +201,29 @@ test.describe('fleet view', () => {
     }
   });
 
+  test('a node in maintenance shows its reason in the Maintenance column', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    await expect(page.getByText(/\d+ nodes/)).toBeVisible();
+
+    // There is no separate reason column to take up room.
+    await expect(page.getByRole('columnheader', { name: 'Maintenance reason' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'All nodes' }).click();
+    await page.getByRole('menuitem', { name: 'In maintenance only' }).click();
+
+    // The fixtures give some maintenance nodes a reason and leave others without.
+    const reasons = page
+      .getByRole('cell')
+      .filter({ hasText: /^(Awaiting DIMM|Failed disk|Held for|Suspected PSU)/ });
+    const bare = page.getByRole('cell').filter({ hasText: /^maintenance$/ });
+    await expect(reasons.first()).toBeVisible();
+    await expect(bare.first()).toBeVisible();
+    // The full reason is on hover for when it is truncated.
+    await reasons.first().hover();
+    await expect(page.getByRole('tooltip').first()).toContainText(/\w/);
+  });
+
   test('searching narrows the fleet and can be reset', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
