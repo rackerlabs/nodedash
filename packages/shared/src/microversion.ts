@@ -77,6 +77,7 @@ export function negotiateMicroversion(serverMax: string | null | undefined): str
  */
 export const CAPABILITY_MICROVERSIONS = {
   nodeHistory: '1.78',
+  childNodes: '1.83',
   inventory: '1.81',
   firmware: '1.86',
   serviceSteps: '1.87',

@@ -257,6 +257,9 @@ function serviceTag(rng: Rng, length: number): string {
   return tag;
 }
 
+/** One node in this many gets child nodes, as a DPU or similar hangs off a host. */
+const CHILD_NODE_EVERY = 20;
+
 function nodeName(rng: Rng, manufacturer: string): string {
   const prefix = NAME_PREFIXES[manufacturer] ?? 'NODE';
   // Dell service tags are seven characters; other vendors run longer serials.
@@ -481,6 +484,43 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
     const node = nodes[nodes.length - 1]!;
     if (node.driver === 'idrac' && rng.bool(0.6)) {
       supportAssist.set(uuid, buildSupportAssistHistory(rng, node));
+    }
+  }
+
+  // Appended after the main loop and drawn from their own generator, so adding
+  // them left every other fixture unchanged.
+  const parents = nodes.filter((_, index) => index % CHILD_NODE_EVERY === 0);
+  for (const parent of parents) {
+    const rng = createRng(options.seed + hashUuid(parent.uuid) + 3);
+    const childCount = 1 + rng.int(2);
+    for (let slot = 1; slot <= childCount; slot += 1) {
+      nodes.push({
+        uuid: rng.uuid(),
+        name: `${parent.name}-child${slot}`,
+        power_state: 'power off',
+        target_power_state: null,
+        provision_state: 'available',
+        target_provision_state: null,
+        maintenance: false,
+        maintenance_reason: null,
+        instance_uuid: null,
+        instance_name: null,
+        instance_info: {},
+        last_error: null,
+        driver: 'redfish',
+        resource_class: 'baremetal-dpu',
+        conductor_group: parent.conductor_group,
+        traits: [],
+        console_enabled: false,
+        owner: parent.owner,
+        lessee: parent.lessee,
+        parent_node: parent.uuid,
+        description: `Child of ${parent.name}`,
+        properties: { cpus: 8, memory_mb: 16384, local_gb: 64, cpu_arch: 'aarch64' },
+        extra: {},
+        created_at: parent.created_at,
+        updated_at: parent.updated_at,
+      });
     }
   }
 

@@ -90,6 +90,7 @@ export const CapabilitiesResponseSchema = z.object({
   negotiatedVersion: z.string(),
   capabilities: z.object({
     nodeHistory: z.boolean(),
+    childNodes: z.boolean(),
     inventory: z.boolean(),
     firmware: z.boolean(),
     serviceSteps: z.boolean(),

@@ -75,6 +75,48 @@ describe('mock backend: node visibility', () => {
   });
 });
 
+describe('mock backend: child nodes', () => {
+  it('seeds children that point at a parent the same project can see', () => {
+    const { backend } = setup();
+    const children = backend.fixtures.nodes.filter((node) => node.parent_node);
+    expect(children.length).toBeGreaterThan(0);
+    for (const child of children) {
+      const parent = backend.fixtures.nodes.find((node) => node.uuid === child.parent_node)!;
+      expect(parent.parent_node).toBeFalsy();
+      expect(child.owner).toBe(parent.owner);
+    }
+  });
+
+  it('lists children alongside their parents where the region supports them', () => {
+    const { backend, project } = setup();
+    const listed = backend.listNodes({ limit: 5000 }).nodes;
+    const expected = backend.fixtures.nodes.filter((node) => node.owner === project.id && node.parent_node);
+    expect(expected.length).toBeGreaterThan(0);
+    const uuids = new Set(listed.map((node) => node.uuid));
+    for (const child of expected) {
+      expect(uuids.has(child.uuid)).toBe(true);
+      expect(uuids.has(child.parent_node!)).toBe(true);
+    }
+  });
+
+  it('hides children where the region predates microversion 1.83', () => {
+    const scenario = { ...findScenario('legacy'), serverMaxVersion: '1.82', latencyMs: 0 };
+    const backend = createMockBackend({ scenario });
+    backend.login('corp-sso');
+    backend.setScope(backend.fixtures.projects[0]!.id);
+
+    const listed = backend.listNodes({ limit: 5000 }).nodes;
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.some((node) => node.parent_node)).toBe(false);
+  });
+
+  it('still reads a child directly', () => {
+    const { backend, project } = setup();
+    const child = backend.fixtures.nodes.find((node) => node.parent_node && node.owner === project.id)!;
+    expect(backend.getNode(child.uuid).parent_node).toBe(child.parent_node);
+  });
+});
+
 describe('mock backend: extra fields', () => {
   it('creates a field the node lacks and replaces one it has', () => {
     const { backend, nodes } = setup();
@@ -589,7 +631,8 @@ describe('mock backend: domains, ownership and leases', () => {
 
     let dell = 0;
     let other = 0;
-    for (const node of backend.fixtures.nodes) {
+    // Children are DPU-style add-ons, not hosts, so carry no hardware model trait.
+    for (const node of backend.fixtures.nodes.filter((node) => !node.parent_node)) {
       const isDell = (node.traits ?? []).some((trait) => trait.startsWith('CUSTOM_DELL_'));
       const owner = byId.get(node.owner!)!.name;
       if (isDell) {
@@ -606,7 +649,7 @@ describe('mock backend: domains, ownership and leases', () => {
 
   it('never gives a node another vendor’s model trait', () => {
     const { backend } = setupWithClock();
-    for (const node of backend.fixtures.nodes) {
+    for (const node of backend.fixtures.nodes.filter((node) => !node.parent_node)) {
       const models = (node.traits ?? []).filter(
         (trait) =>
           trait.startsWith('CUSTOM_DELL_') ||

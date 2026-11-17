@@ -68,6 +68,7 @@ describe('buildCapabilityReport', () => {
     const report = buildCapabilityReport('1.114');
     expect(report.negotiatedVersion).toBe('1.114');
     expect(report.capabilities).toMatchObject({
+      childNodes: true,
       inventory: true,
       firmware: true,
       serviceSteps: true,
@@ -80,6 +81,7 @@ describe('buildCapabilityReport', () => {
   it('hides features an older server cannot serve', () => {
     const report = buildCapabilityReport('1.85');
     expect(report.capabilities).toMatchObject({
+      childNodes: true,
       inventory: true,
       firmware: false,
       serviceSteps: false,
@@ -93,6 +95,11 @@ describe('buildCapabilityReport', () => {
     const report = buildCapabilityReport(undefined);
     expect(Object.values(report.capabilities).every((value) => value === false)).toBe(true);
     expect(report.serverMaxVersion).toBeNull();
+  });
+
+  it('lists child nodes only from 1.83', () => {
+    expect(buildCapabilityReport('1.82').capabilities.childNodes).toBe(false);
+    expect(buildCapabilityReport('1.83').capabilities.childNodes).toBe(true);
   });
 
   it('turns on runbook traits only from 1.112', () => {
