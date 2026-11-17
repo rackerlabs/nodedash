@@ -247,10 +247,20 @@ describe('encrypted session cookie', () => {
     });
   });
 
-  it('refuses a WebSSO callback that was not started from this browser', async () => {
+  it('sends a WebSSO callback that was not started from this browser back to sign-in', async () => {
     const app = await server();
     const response = await postBack(app, new Jar());
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe('/login?error=login_expired&next=%2Fnodes');
+  });
+
+  it('sends a replayed WebSSO callback back to sign-in, not to a JSON error', async () => {
+    const app = await server();
+    const jar = new Jar();
+    await signIn(app, jar);
+    const replay = await call(app, jar, 'GET', '/api/auth/websso/complete');
+    expect(replay.statusCode).toBe(302);
+    expect(replay.headers.location).toContain('/login?error=login_expired');
   });
 
   it('tells the browser to drop the WebSSO state once the callback has used it', async () => {

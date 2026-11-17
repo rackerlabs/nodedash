@@ -132,6 +132,23 @@ test.describe('regions', () => {
   });
 });
 
+test.describe('sign-in failures', () => {
+  test('a rejected sign-in returns to the login page and says so', async ({ page }) => {
+    await page.goto('/nodes?scenario=sign-in-fails');
+    await page.getByRole('button', { name: /Continue with Corp SSO/ }).click();
+
+    await expect(page).toHaveURL(/\/login\?error=login_failed/);
+    await expect(page.getByRole('alert')).toHaveText(/Sign-in could not be completed/);
+    // Still signed out, and able to try again.
+    await expect(page.getByRole('button', { name: /Continue with Corp SSO/ })).toBeVisible();
+  });
+
+  test('an expired callback explains itself on the login page', async ({ page }) => {
+    await page.goto('/login?error=login_expired&next=%2Fnodes&scenario=default');
+    await expect(page.getByRole('alert')).toHaveText(/expired or was not started from this page/);
+  });
+});
+
 test.describe('fleet view', () => {
   test('signs in, scopes to a project and lists nodes', async ({ page }) => {
     await signIn(page);

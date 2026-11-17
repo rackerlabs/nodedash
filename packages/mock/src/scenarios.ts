@@ -36,6 +36,8 @@ export interface Scenario {
   readFailureRate: number;
   /** Force every mutating request to be rejected, to exercise error surfaces. */
   rejectMutations: boolean;
+  /** Keystone refuses the token WebSSO hands back, so sign-in fails. */
+  rejectSignIn: boolean;
   /** Start signed out rather than pre-authenticated. */
   startSignedOut: boolean;
   /**
@@ -64,6 +66,7 @@ const base: Omit<Scenario, 'id' | 'label' | 'description'> = {
   latencyMs: 120,
   readFailureRate: 0,
   rejectMutations: false,
+  rejectSignIn: false,
   startSignedOut: true,
   regions: [{ id: 'lab-1', description: 'Lab region' }],
   supportAssistMs: 45_000,
@@ -106,6 +109,13 @@ export const SCENARIOS: Scenario[] = [
     description: 'Reads fail intermittently and every mutation is rejected.',
     readFailureRate: 0.35,
     rejectMutations: true,
+  },
+  {
+    ...base,
+    id: 'sign-in-fails',
+    label: 'Failing sign-in',
+    description: 'Keystone rejects the WebSSO token, so sign-in returns to the login page with an error.',
+    rejectSignIn: true,
   },
   {
     ...base,

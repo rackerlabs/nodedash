@@ -35,6 +35,12 @@ export function sanitizeNext(next: unknown): string {
   return next;
 }
 
+/** The sign-in page, told why the visitor is back there. */
+export function loginErrorPath(error: 'login_expired' | 'login_failed', next: unknown): string {
+  const params = new URLSearchParams({ error, next: sanitizeNext(next) });
+  return `/login?${params}`;
+}
+
 export function buildWebssoUrl(config: Config, idpId: string | undefined): string {
   const provider = config.identityProviders.find((candidate) => candidate.id === idpId);
   const protocol = provider?.protocol ?? config.webssoProtocol;
@@ -86,13 +92,23 @@ export function registerAuthRoutes(app: FastifyInstance, config: Config, keyston
     // Single use: a replayed callback finds no state.
     request.websso.delete();
     request.webssoPending.delete();
+    // This is a browser navigation, so a failure goes back to the sign-in page,
+    // which explains it, rather than showing the user a JSON error body.
     if (!nonce || !token) {
-      throw badRequest('Login session expired or was not started here. Start again from the sign-in page.');
+      audit(request, { action: 'login', outcome: 'failed', detail: { reason: 'no_state' } });
+      return reply.redirect(loginErrorPath('login_expired', next), 302);
     }
 
     // The token goes straight into the encrypted session cookie, which
     // JavaScript cannot read.
-    const identity = await keystone.identify(token);
+    let identity;
+    try {
+      identity = await keystone.identify(token);
+    } catch (error) {
+      request.log.warn({ err: error }, 'WebSSO token was not accepted');
+      audit(request, { action: 'login', outcome: 'failed', detail: { reason: 'identify' } });
+      return reply.redirect(loginErrorPath('login_failed', next), 302);
+    }
 
     // Start from an empty session on every login, so nothing from before sign-in
     // (or from another user on this browser) carries over.

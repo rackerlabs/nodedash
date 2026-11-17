@@ -17,7 +17,7 @@ limitations under the License.
 import { DEFAULT_BRANDING } from '@nodedash/shared';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../config.ts';
-import { buildWebssoUrl, sanitizeNext } from './auth.ts';
+import { buildWebssoUrl, loginErrorPath, sanitizeNext } from './auth.ts';
 
 const baseEnv = {
   PUBLIC_URL: 'https://nodes.example.invalid',
@@ -46,6 +46,18 @@ describe('sanitizeNext', () => {
     ]) {
       expect(sanitizeNext(value)).toBe('/nodes');
     }
+  });
+});
+
+describe('loginErrorPath', () => {
+  it('sends the visitor to the sign-in page with the reason and where they were headed', () => {
+    expect(loginErrorPath('login_expired', '/nodes/abc?tab=1')).toBe(
+      '/login?error=login_expired&next=%2Fnodes%2Fabc%3Ftab%3D1',
+    );
+  });
+
+  it('does not carry an unsafe destination through', () => {
+    expect(loginErrorPath('login_failed', '//evil.example')).toBe('/login?error=login_failed&next=%2Fnodes');
   });
 });
 

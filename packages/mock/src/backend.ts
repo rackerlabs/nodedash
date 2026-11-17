@@ -402,6 +402,9 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     },
 
     login(idp: string) {
+      if (scenario.rejectSignIn) {
+        throw new MockApiError(401, 'unauthenticated', 'Keystone rejected the token.');
+      }
       session = {
         ...session,
         authenticated: true,
