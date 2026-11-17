@@ -132,6 +132,18 @@ test.describe('regions', () => {
   });
 });
 
+test.describe('branding', () => {
+  test('the tab icon is the brand mark, served as an SVG', async ({ page }) => {
+    await page.goto('/login?scenario=default');
+    const icon = page.locator('link[rel="icon"]');
+    await expect(icon).toHaveAttribute('type', 'image/svg+xml');
+    const href = await icon.getAttribute('href');
+    const response = await page.request.get(href!);
+    expect(response.ok()).toBe(true);
+    expect(response.headers()['content-type']).toContain('image/svg+xml');
+  });
+});
+
 test.describe('sign-in failures', () => {
   test('a rejected sign-in returns to the login page and says so', async ({ page }) => {
     await page.goto('/nodes?scenario=sign-in-fails');
