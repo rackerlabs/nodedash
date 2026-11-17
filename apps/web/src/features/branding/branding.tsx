@@ -18,6 +18,7 @@ import { type Branding, DEFAULT_BRANDING } from '@nodedash/shared';
 import { Server } from 'lucide-react';
 import { useEffect } from 'react';
 import { useSession } from '@/features/auth/session';
+import defaultFaviconUrl from '@/assets/favicon.svg';
 import { cn } from '@/lib/utils';
 
 /** The deployment's branding, from the session; the defaults until it loads. */
@@ -32,11 +33,20 @@ export function BrandMark({ className }: { className?: string }) {
   return <Server className={cn('text-primary', className)} aria-hidden />;
 }
 
-/** Keeps the tab title on the configured name. Renders nothing. */
+/** Keeps the tab title and icon on the configured name and logo. Renders nothing. */
 export function BrandTitle() {
-  const { name } = useBranding();
+  const { name, logoUrl } = useBranding();
   useEffect(() => {
     document.title = name;
   }, [name]);
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) return;
+    // The default is an SVG; a configured logo could be any image type, so let the
+    // browser sniff it rather than claim one.
+    if (logoUrl) link.removeAttribute('type');
+    else link.type = 'image/svg+xml';
+    link.href = logoUrl ?? defaultFaviconUrl;
+  }, [logoUrl]);
   return null;
 }
