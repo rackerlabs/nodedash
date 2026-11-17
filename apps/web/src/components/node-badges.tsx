@@ -76,13 +76,22 @@ export function PowerStateBadge({
   );
 }
 
-export function MaintenanceBadge({ maintenance, reason }: { maintenance: boolean; reason?: string | null }) {
+/** With `showReason`, a recorded reason replaces the word "maintenance" in the badge (truncated, in full on hover). */
+export function MaintenanceBadge({
+  maintenance,
+  reason,
+  showReason = false,
+}: {
+  maintenance: boolean;
+  reason?: string | null;
+  showReason?: boolean;
+}) {
   if (!maintenance) return <span className="text-xs text-muted-foreground">no</span>;
   return (
     <Hint label={reason ? reason : 'In maintenance, no reason recorded'}>
-      <Badge tone="error">
-        <Wrench className="size-3" />
-        maintenance
+      <Badge tone="error" className="max-w-full">
+        <Wrench className="size-3 shrink-0" />
+        <span className="truncate">{showReason && reason ? reason : 'maintenance'}</span>
       </Badge>
     </Hint>
   );

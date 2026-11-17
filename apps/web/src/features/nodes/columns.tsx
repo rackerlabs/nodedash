@@ -23,10 +23,19 @@ import { useRegionPaths } from '@/lib/paths';
 
 const helper = createColumnHelper<NodeRow>();
 
-/** Grid width for each column, in the order the columns are declared. */
+/**
+ * Grid sizing for each column. `min` is in rem and is what the table's overall
+ * minimum width is summed from, so the header and every row resolve their `fr`
+ * tracks against the same width. `grow` is the share of any spare room; leave it
+ * out for a fixed-width column.
+ */
 export interface ColumnMeta {
-  width: string;
-  align?: 'left' | 'right';
+  min: number;
+  grow?: number;
+}
+
+export function columnTrack({ min, grow }: ColumnMeta): string {
+  return grow ? `minmax(${min}rem, ${grow}fr)` : `${min}rem`;
 }
 
 function NodeNameLink({ uuid, name }: { uuid: string; name: string | null }) {
@@ -49,18 +58,18 @@ function dash(value: string | null) {
 export const nodeColumns = [
   helper.accessor('name', {
     header: 'Name',
-    meta: { width: 'minmax(9.5rem, 1fr)' } satisfies ColumnMeta,
+    meta: { min: 9.5, grow: 1 } satisfies ColumnMeta,
     // A real link, so a node can be middle-clicked or opened in a new tab.
     cell: (context) => <NodeNameLink uuid={context.row.original.uuid} name={context.getValue()} />,
   }),
   helper.accessor('uuid', {
     header: 'UUID',
-    meta: { width: 'minmax(14.5rem, 1fr)' } satisfies ColumnMeta,
+    meta: { min: 14.5, grow: 1 } satisfies ColumnMeta,
     cell: (context) => <CopyValue value={context.getValue()} label="Copy node UUID" />,
   }),
   helper.accessor('resourceClass', {
     header: 'Resource class',
-    meta: { width: 'minmax(10rem, 0.8fr)' } satisfies ColumnMeta,
+    meta: { min: 10, grow: 0.8 } satisfies ColumnMeta,
     cell: (context) => {
       const value = context.getValue();
       return value ? <span className="truncate">{value}</span> : dash(value);
@@ -68,21 +77,21 @@ export const nodeColumns = [
   }),
   helper.accessor('provisionState', {
     header: 'Provision state',
-    meta: { width: 'minmax(10.5rem, 0.8fr)' } satisfies ColumnMeta,
+    meta: { min: 10.5, grow: 0.8 } satisfies ColumnMeta,
     cell: (context) => (
       <ProvisionStateBadge state={context.getValue()} target={context.row.original.targetProvisionState} />
     ),
   }),
   helper.accessor('powerState', {
     header: 'Power',
-    meta: { width: '6rem' } satisfies ColumnMeta,
+    meta: { min: 6 } satisfies ColumnMeta,
     cell: (context) => (
       <PowerStateBadge state={context.getValue()} target={context.row.original.targetPowerState} />
     ),
   }),
   helper.accessor('instanceUuid', {
     header: 'Instance UUID',
-    meta: { width: 'minmax(14.5rem, 1fr)' } satisfies ColumnMeta,
+    meta: { min: 14.5, grow: 1 } satisfies ColumnMeta,
     cell: (context) => {
       const value = context.getValue();
       return value ? <CopyValue value={value} label="Copy instance UUID" /> : dash(value);
@@ -90,7 +99,7 @@ export const nodeColumns = [
   }),
   helper.accessor('instanceName', {
     header: 'Instance name',
-    meta: { width: 'minmax(9rem, 0.9fr)' } satisfies ColumnMeta,
+    meta: { min: 9, grow: 0.9 } satisfies ColumnMeta,
     cell: (context) => {
       const value = context.getValue();
       return value ? <span className="truncate">{value}</span> : dash(value);
@@ -98,29 +107,20 @@ export const nodeColumns = [
   }),
   helper.accessor('maintenance', {
     header: 'Maintenance',
-    meta: { width: '8rem' } satisfies ColumnMeta,
+    meta: { min: 12, grow: 1.4 } satisfies ColumnMeta,
     // Sort so nodes needing attention come first on the initial click.
     sortingFn: (a, b) => Number(b.original.maintenance) - Number(a.original.maintenance),
     cell: (context) => (
-      <MaintenanceBadge maintenance={context.getValue()} reason={context.row.original.maintenanceReason} />
+      <MaintenanceBadge
+        maintenance={context.getValue()}
+        reason={context.row.original.maintenanceReason}
+        showReason
+      />
     ),
-  }),
-  helper.accessor('maintenanceReason', {
-    header: 'Maintenance reason',
-    meta: { width: 'minmax(12rem, 1.4fr)' } satisfies ColumnMeta,
-    cell: (context) => {
-      const value = context.getValue();
-      return value ? (
-        <span className="truncate text-muted-foreground" title={value}>
-          {value}
-        </span>
-      ) : (
-        dash(value)
-      );
-    },
   }),
 ];
 
+/** Every field a CSV export carries. The reason has no column of its own: the table shows it in Maintenance. */
 export const DEFAULT_COLUMN_LABELS: Record<string, string> = {
   name: 'Name',
   uuid: 'UUID',
@@ -132,3 +132,8 @@ export const DEFAULT_COLUMN_LABELS: Record<string, string> = {
   maintenance: 'Maintenance',
   maintenanceReason: 'Maintenance reason',
 };
+
+/** The columns the table can show or hide. */
+export const TABLE_COLUMN_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(DEFAULT_COLUMN_LABELS).filter(([id]) => id !== 'maintenanceReason'),
+);
