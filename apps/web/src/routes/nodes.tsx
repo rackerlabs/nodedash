@@ -33,7 +33,7 @@ import {
 import { Empty, Skeleton, Spinner } from '@/components/ui/misc';
 import { Hint } from '@/components/ui/tooltip';
 import { useSession } from '@/features/auth/session';
-import { DEFAULT_COLUMN_LABELS } from '@/features/nodes/columns';
+import { DEFAULT_COLUMN_LABELS, TABLE_COLUMN_LABELS } from '@/features/nodes/columns';
 import { csvFilename, downloadCsv, nodesToCsv } from '@/features/nodes/csv';
 import {
   applyNodeFilters,
@@ -174,7 +174,7 @@ export function NodesPage() {
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {Object.entries(DEFAULT_COLUMN_LABELS).map(([id, label]) => (
+            {Object.entries(TABLE_COLUMN_LABELS).map(([id, label]) => (
               <DropdownMenuCheckboxItem
                 key={id}
                 checked={columnVisibility[id] !== false}

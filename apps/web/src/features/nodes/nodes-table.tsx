@@ -29,7 +29,7 @@ import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { useNavigate } from 'react-router';
 import { useRegionPaths } from '@/lib/paths';
 import { cn } from '@/lib/utils';
-import { nodeColumns, type ColumnMeta } from './columns';
+import { columnTrack, nodeColumns, type ColumnMeta } from './columns';
 
 const ROW_HEIGHT = 40;
 
@@ -81,13 +81,17 @@ export function NodesTable({
     overscan: 14,
   });
 
-  const gridTemplate = useMemo(
-    () =>
-      visibleColumns
-        .map((column) => (column.columnDef.meta as ColumnMeta | undefined)?.width ?? '1fr')
-        .join(' '),
-    [visibleColumns],
-  );
+  // The header and the rows are separate grids, so they only line up if they share
+  // both the tracks and a minimum width. `max-content` would differ between them.
+  const { gridTemplate, minWidth } = useMemo(() => {
+    const metas = visibleColumns.map(
+      (column) => (column.columnDef.meta as ColumnMeta | undefined) ?? { min: 8, grow: 1 },
+    );
+    return {
+      gridTemplate: metas.map(columnTrack).join(' '),
+      minWidth: `${metas.reduce((total, meta) => total + meta.min, 0)}rem`,
+    };
+  }, [visibleColumns]);
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -103,7 +107,7 @@ export function NodesTable({
           role="row"
           aria-rowindex={1}
           className="sticky top-0 z-10 grid border-b border-border bg-card text-xs font-medium text-muted-foreground"
-          style={{ gridTemplateColumns: gridTemplate, minWidth: 'max-content' }}
+          style={{ gridTemplateColumns: gridTemplate, minWidth }}
         >
           {table.getHeaderGroups()[0]?.headers.map((header, index) => {
             const sorted = header.column.getIsSorted();
@@ -142,10 +146,7 @@ export function NodesTable({
           })}
         </div>
 
-        <div
-          role="rowgroup"
-          style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth: 'max-content' }}
-        >
+        <div role="rowgroup" style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth }}>
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const row = tableRows[virtualRow.index];
             if (!row) return null;
