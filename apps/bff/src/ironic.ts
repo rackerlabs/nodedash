@@ -124,9 +124,14 @@ export class IronicClient {
     const nodes: IronicNode[] = [];
     let marker = options.marker;
 
+    // Ironic hides child nodes unless asked (`baremetal node list --include-children`).
+    // Older servers reject the parameter, so it is sent only where it exists.
+    const { capabilities } = await this.capabilities(target.endpoint);
+    const includeChildren = capabilities.childNodes ? 'true' : undefined;
+
     for (let page = 0; page < this.config.maxNodePages; page += 1) {
       const result = await this.json<{ nodes: IronicNode[] }>(target, '/v1/nodes', {
-        query: { detail: 'true', limit, marker },
+        query: { detail: 'true', limit, marker, include_children: includeChildren },
       });
       nodes.push(...result.nodes);
       if (result.nodes.length < limit) return { nodes, next: null };

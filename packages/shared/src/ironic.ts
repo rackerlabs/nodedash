@@ -58,6 +58,8 @@ export const NodeSchema = z.looseObject({
   console_enabled: z.boolean().nullish(),
   owner: z.string().nullish(),
   lessee: z.string().nullish(),
+  /** Set on a child node (1.83+): the uuid of the node it hangs off. */
+  parent_node: z.string().nullish(),
   description: z.string().nullish(),
   properties: jsonRecord.nullish(),
   /** Free-form metadata operators and tooling attach to the node. */

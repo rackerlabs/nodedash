@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { describe, expect, it } from 'vitest';
-import { ironicMessage } from './ironic.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { loadConfig } from './config.ts';
+import { IronicClient, ironicMessage } from './ironic.ts';
 
 /** Ironic reports failures in several shapes depending on version and driver. */
 describe('ironicMessage', () => {
@@ -53,5 +54,46 @@ describe('ironicMessage', () => {
   it('truncates a huge upstream body rather than forwarding all of it', () => {
     const message = ironicMessage({ status: 500, body: null, text: 'x'.repeat(5000) });
     expect(message.length).toBeLessThanOrEqual(300);
+  });
+});
+
+describe('allNodes', () => {
+  const config = loadConfig({
+    PUBLIC_URL: 'https://nodes.example.invalid',
+    KEYSTONE_URL: 'https://keystone.example.invalid',
+    SESSION_KEYS: Buffer.alloc(32, 1).toString('base64'),
+  } as NodeJS.ProcessEnv);
+
+  /** Fake Ironic that reports `maxVersion` and records the node list URLs it is asked for. */
+  function fakeIronic(maxVersion: string): string[] {
+    const listed: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: URL | string) => {
+        const url = new URL(String(input));
+        if (url.pathname === '/v1') {
+          return new Response('{}', { headers: { 'x-openstack-ironic-api-maximum-version': maxVersion } });
+        }
+        listed.push(url.search);
+        return new Response(JSON.stringify({ nodes: [] }));
+      }),
+    );
+    return listed;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks for child nodes, which Ironic hides by default', async () => {
+    const listed = fakeIronic('1.114');
+    const client = new IronicClient(config);
+    await client.allNodes({ token: 'token', endpoint: 'https://ironic.north1.example.invalid' });
+    expect(new URLSearchParams(listed[0]).get('include_children')).toBe('true');
+  });
+
+  it('leaves the parameter off where Ironic predates it', async () => {
+    const listed = fakeIronic('1.82');
+    const client = new IronicClient(config);
+    await client.allNodes({ token: 'token', endpoint: 'https://ironic.east2.example.invalid' });
+    expect(new URLSearchParams(listed[0]).has('include_children')).toBe(false);
   });
 });

@@ -482,7 +482,11 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
     listNodes({ limit = 500, marker }) {
       const scope = requireScope();
       settle();
-      const visible = fixtures.nodes.filter((node) => isVisibleTo(node, scope.projectId));
+      // Ironic hides child nodes unless asked; the BFF asks wherever the region can answer.
+      const showChildren = capabilities.capabilities.childNodes;
+      const visible = fixtures.nodes.filter(
+        (node) => isVisibleTo(node, scope.projectId) && (showChildren || !node.parent_node),
+      );
       const start = marker ? visible.findIndex((node) => node.uuid === marker) + 1 : 0;
       const page = visible.slice(start, start + limit);
       const next = start + limit < visible.length ? (page[page.length - 1]?.uuid ?? null) : null;
