@@ -46,6 +46,7 @@ export interface NodeRow {
   targetPowerState: string | null;
   instanceUuid: string | null;
   instanceName: string | null;
+  lessee: string | null;
   maintenance: boolean;
   maintenanceReason: string | null;
   lastError: string | null;
@@ -63,6 +64,7 @@ export function toNodeRow(node: IronicNode): NodeRow {
     targetPowerState: node.target_power_state ?? null,
     instanceUuid: node.instance_uuid ?? null,
     instanceName: resolveInstanceName(node),
+    lessee: node.lessee ?? null,
     maintenance: node.maintenance === true,
     maintenanceReason: node.maintenance_reason ?? null,
     lastError: node.last_error ?? null,

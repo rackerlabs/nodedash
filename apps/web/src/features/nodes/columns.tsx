@@ -89,6 +89,27 @@ export const nodeColumns = [
       <PowerStateBadge state={context.getValue()} target={context.row.original.targetPowerState} />
     ),
   }),
+  helper.accessor('lessee', {
+    header: 'Lessee',
+    meta: { min: 14.5, grow: 1 } satisfies ColumnMeta,
+    cell: (context) => {
+      const value = context.getValue();
+      return value ? <CopyValue value={value} label="Copy lessee UUID" /> : dash(value);
+    },
+  }),
+  helper.accessor('maintenance', {
+    header: 'Maintenance',
+    meta: { min: 12, grow: 1.4 } satisfies ColumnMeta,
+    // Sort so nodes needing attention come first on the initial click.
+    sortingFn: (a, b) => Number(b.original.maintenance) - Number(a.original.maintenance),
+    cell: (context) => (
+      <MaintenanceBadge
+        maintenance={context.getValue()}
+        reason={context.row.original.maintenanceReason}
+        showReason
+      />
+    ),
+  }),
   helper.accessor('instanceUuid', {
     header: 'Instance UUID',
     meta: { min: 14.5, grow: 1 } satisfies ColumnMeta,
@@ -105,19 +126,6 @@ export const nodeColumns = [
       return value ? <span className="truncate">{value}</span> : dash(value);
     },
   }),
-  helper.accessor('maintenance', {
-    header: 'Maintenance',
-    meta: { min: 12, grow: 1.4 } satisfies ColumnMeta,
-    // Sort so nodes needing attention come first on the initial click.
-    sortingFn: (a, b) => Number(b.original.maintenance) - Number(a.original.maintenance),
-    cell: (context) => (
-      <MaintenanceBadge
-        maintenance={context.getValue()}
-        reason={context.row.original.maintenanceReason}
-        showReason
-      />
-    ),
-  }),
 ];
 
 /** Every field a CSV export carries. The reason has no column of its own: the table shows it in Maintenance. */
@@ -127,10 +135,11 @@ export const DEFAULT_COLUMN_LABELS: Record<string, string> = {
   resourceClass: 'Resource class',
   provisionState: 'Provision state',
   powerState: 'Power',
-  instanceUuid: 'Instance UUID',
-  instanceName: 'Instance name',
+  lessee: 'Lessee',
   maintenance: 'Maintenance',
   maintenanceReason: 'Maintenance reason',
+  instanceUuid: 'Instance UUID',
+  instanceName: 'Instance name',
 };
 
 /** The columns the table can show or hide. */

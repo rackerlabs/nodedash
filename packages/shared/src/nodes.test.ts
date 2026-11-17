@@ -63,9 +63,16 @@ describe('toNodeRow', () => {
       provisionState: 'active',
       instanceUuid: null,
       instanceName: null,
+      lessee: null,
       maintenance: false,
       maintenanceReason: null,
     });
+  });
+
+  it('carries the lessee project id through', () => {
+    expect(toNodeRow(node({ lessee: 'eeee5555-0000-4000-a000-000000000005' })).lessee).toBe(
+      'eeee5555-0000-4000-a000-000000000005',
+    );
   });
 
   it('treats a missing maintenance flag as not in maintenance', () => {

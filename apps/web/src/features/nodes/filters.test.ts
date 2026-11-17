@@ -29,6 +29,7 @@ function row(overrides: Partial<NodeRow> = {}): NodeRow {
     targetPowerState: null,
     instanceUuid: null,
     instanceName: null,
+    lessee: null,
     maintenance: false,
     maintenanceReason: null,
     lastError: null,
@@ -52,6 +53,7 @@ const fleet: NodeRow[] = [
     provisionState: 'available',
     instanceUuid: 'dddd4444-0000-4000-a000-000000000004',
     instanceName: 'web-west3-0001',
+    lessee: 'eeee5555-0000-4000-a000-000000000005',
   }),
 ];
 
@@ -60,12 +62,13 @@ describe('applyNodeFilters', () => {
     expect(applyNodeFilters(fleet, EMPTY_FILTERS)).toHaveLength(3);
   });
 
-  it('searches across node name, uuid, instance and maintenance reason', () => {
+  it('searches across node name, uuid, instance, lessee and maintenance reason', () => {
     const cases: Array<[string, string]> = [
       ['east2', 'r02u09-east2'],
       ['cccc3333', 'r03u14-west3'],
       ['web-west3', 'r03u14-west3'],
       ['dddd4444', 'r03u14-west3'],
+      ['eeee5555', 'r03u14-west3'],
       ['slot 3', 'r02u09-east2'],
     ];
     for (const [needle, expected] of cases) {

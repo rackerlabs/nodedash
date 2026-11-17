@@ -29,6 +29,7 @@ function row(overrides: Partial<NodeRow> = {}): NodeRow {
     targetPowerState: null,
     instanceUuid: null,
     instanceName: null,
+    lessee: null,
     maintenance: false,
     maintenanceReason: null,
     lastError: null,
