@@ -172,9 +172,10 @@ test.describe('fleet view', () => {
       'UUID',
       'Resource class',
       'Provision state',
+      'Lessee',
+      'Maintenance',
       'Instance UUID',
       'Instance name',
-      'Maintenance',
     ]) {
       await expect(page.getByRole('columnheader', { name: header, exact: true })).toBeVisible();
     }
@@ -279,7 +280,7 @@ test.describe('fleet view', () => {
     const ascending = await exportCsv();
     expect(ascending.filename).toMatch(/^nodes-lab-1-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(ascending.header).toBe(
-      'Name,UUID,Resource class,Provision state,Power,Instance UUID,Instance name,Maintenance,Maintenance reason',
+      'Name,UUID,Resource class,Provision state,Power,Lessee,Maintenance,Maintenance reason,Instance UUID,Instance name',
     );
     expect(ascending.rows).toHaveLength(matches);
     for (const row of ascending.rows) expect(row).toContain('west3');

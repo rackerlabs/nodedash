@@ -32,7 +32,7 @@ export const EMPTY_FILTERS: NodeFilters = {
 
 /**
  * Free-text search spans every column an operator is likely to paste in: node
- * name, node uuid, instance uuid, instance name and the maintenance reason.
+ * name, node uuid, instance uuid, instance name, lessee and the maintenance reason.
  */
 function matchesSearch(row: NodeRow, needle: string): boolean {
   if (!needle) return true;
@@ -41,6 +41,7 @@ function matchesSearch(row: NodeRow, needle: string): boolean {
     row.uuid,
     row.instanceUuid,
     row.instanceName,
+    row.lessee,
     row.provisionState,
     row.maintenanceReason,
   ];
