@@ -460,6 +460,9 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
         local_gb: rng.pick([446, 893, 1788]),
         cpu_arch: 'x86_64',
       },
+      driver_info: {
+        redfish_address: `https://bmc-r${String(rack).padStart(2, '0')}u${String(unit).padStart(2, '0')}.${site}.example.invalid`,
+      },
       // Built from values already drawn, so adding it left every later fixture
       // unchanged. Nodes still enrolling have none yet.
       extra:

@@ -317,6 +317,21 @@ test.describe('node detail', () => {
     }
   });
 
+  test('puts the resource class with the identity and the BMC address under management', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    await openFirstNode(page);
+
+    // The nearest ancestor of the title that holds a field list is its card.
+    const card = (title: string) =>
+      page.getByText(title, { exact: true }).locator('xpath=ancestor::div[.//dl][1]');
+    await expect(card('Identity and state').getByText('Resource class', { exact: true })).toBeVisible();
+    await expect(card('Management').getByText('Resource class', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Maintenance reason', { exact: true })).toHaveCount(0);
+    await expect(card('Management').getByText('BMC address', { exact: true })).toBeVisible();
+    await expect(card('Management').getByText(/^https:\/\/bmc-.*\.example\.invalid$/)).toBeVisible();
+  });
+
   test('names PCI devices from pci.ids and leaves bridges out', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);

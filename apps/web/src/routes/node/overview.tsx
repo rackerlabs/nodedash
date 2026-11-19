@@ -17,7 +17,7 @@ limitations under the License.
 import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { CopyValue } from '@/components/copy-value';
-import { PowerStateBadge, ProvisionStateBadge } from '@/components/node-badges';
+import { MaintenanceBadge, PowerStateBadge, ProvisionStateBadge } from '@/components/node-badges';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,7 @@ import { useNodeContext } from './context';
 export function NodeOverviewPage() {
   const { node, row } = useNodeContext();
   const properties = (node.properties ?? {}) as Record<string, unknown>;
+  const driverInfo = (node.driver_info ?? {}) as Record<string, unknown>;
   const extra = node.extra ?? {};
   const editableFields = useSession().data?.editableExtraFields ?? [];
   const [editing, setEditing] = useState(false);
@@ -54,6 +55,9 @@ export function NodeOverviewPage() {
             <Field label="Power state">
               <PowerStateBadge state={row.powerState} target={row.targetPowerState} />
             </Field>
+            <Field label="Resource class" mono>
+              {node.resource_class ?? '—'}
+            </Field>
             <Field label="Instance UUID">
               {row.instanceUuid ? (
                 <CopyValue value={row.instanceUuid} label="Copy instance UUID" />
@@ -66,13 +70,10 @@ export function NodeOverviewPage() {
             </Field>
             <Field label="Maintenance">
               {row.maintenance ? (
-                <Badge tone="error">enabled</Badge>
+                <MaintenanceBadge maintenance reason={row.maintenanceReason} showReason />
               ) : (
-                <span className="text-muted-foreground">disabled</span>
+                <span className="text-muted-foreground">—</span>
               )}
-            </Field>
-            <Field label="Maintenance reason">
-              {row.maintenanceReason ?? <span className="text-muted-foreground">—</span>}
             </Field>
             <Field label="Last error" className="sm:col-span-2">
               {row.lastError ? (
@@ -94,8 +95,10 @@ export function NodeOverviewPage() {
             <Field label="Driver" mono>
               {node.driver ?? '—'}
             </Field>
-            <Field label="Resource class" mono>
-              {node.resource_class ?? '—'}
+            <Field label="BMC address" mono>
+              {typeof driverInfo.redfish_address === 'string' && driverInfo.redfish_address
+                ? driverInfo.redfish_address
+                : '—'}
             </Field>
             <Field label="Conductor group" mono>
               {node.conductor_group || '—'}

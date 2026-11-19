@@ -62,6 +62,8 @@ export const NodeSchema = z.looseObject({
   parent_node: z.string().nullish(),
   description: z.string().nullish(),
   properties: jsonRecord.nullish(),
+  /** Credentials are redacted by the BFF; absent fields are normal, so read it defensively. */
+  driver_info: jsonRecord.nullish(),
   /** Free-form metadata operators and tooling attach to the node. */
   extra: jsonRecord.nullish(),
   created_at: z.string().nullish(),
