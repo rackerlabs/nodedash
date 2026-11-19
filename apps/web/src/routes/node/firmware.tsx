@@ -32,9 +32,15 @@ const columns: Array<DataColumn<FirmwareComponent>> = [
   {
     id: 'component',
     header: 'Component',
-    width: '10rem',
+    // Redfish-style names run past 50 characters; every row is its own grid, so a fixed width keeps the
+    // columns aligned and truncation stops the name running into the next column.
+    width: '28rem',
     value: (item) => item.component,
-    render: (item) => <span className="font-mono text-[12px] font-medium">{item.component}</span>,
+    render: (item) => (
+      <span className="block truncate font-mono text-[12px] font-medium" title={item.component}>
+        {item.component}
+      </span>
+    ),
   },
   {
     id: 'current',
@@ -71,10 +77,13 @@ const columns: Array<DataColumn<FirmwareComponent>> = [
   {
     id: 'vendor',
     header: 'Vendor / model',
-    width: 'minmax(11rem, 1fr)',
+    width: 'minmax(14rem, 1fr)',
     value: (item) => `${item.vendor ?? ''} ${item.model ?? ''}`.trim(),
     render: (item) => (
-      <span className="truncate text-muted-foreground">
+      <span
+        className="block truncate text-muted-foreground"
+        title={[item.vendor, item.model].filter(Boolean).join(' · ')}
+      >
         {[item.vendor, item.model].filter(Boolean).join(' · ') || '—'}
       </span>
     ),
