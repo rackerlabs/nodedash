@@ -244,37 +244,16 @@ export const handlers = [
   http.get('/api/nodes/:region/:uuid/vendor-passthru/methods', ({ params }) =>
     respond(() => backend.vendorPassthruMethods(String(params.uuid)), { read: true }),
   ),
-  http.get('/api/nodes/:region/:uuid/support-assist', ({ params }) =>
-    respond(() => backend.listSupportAssist(String(params.uuid)), { read: true }),
+  http.get('/api/nodes/:region/:uuid/support-assist/eula', ({ params }) =>
+    respond(() => backend.supportAssistEula(String(params.uuid)), { read: true }),
   ),
-  http.post('/api/nodes/:region/:uuid/support-assist', async ({ params, request }) => {
-    const payload = await body<{ data_selectors?: never[]; filter_pii?: boolean }>(request);
-    return respond(() =>
-      backend.startSupportAssist(String(params.uuid), {
-        data_selectors: payload.data_selectors ?? [],
-        filter_pii: payload.filter_pii !== false,
-      }),
-    );
+  http.post('/api/nodes/:region/:uuid/support-assist', ({ params }) =>
+    respond(() => backend.startSupportAssist(String(params.uuid))),
+  ),
+  http.post('/api/nodes/:region/:uuid/support-assist/job', async ({ params, request }) => {
+    const payload = await body<{ task_monitor: string }>(request);
+    return respond(() => backend.supportAssistJob(String(params.uuid), payload.task_monitor), { read: true });
   }),
-  /**
-   * The real BFF redirects to short-lived object storage. The mock has no storage,
-   * so it serves the placeholder bundle directly — either way the browser follows
-   * one URL and gets a file, which is what the UI depends on.
-   */
-  http.get('/api/nodes/:region/:uuid/support-assist/:id/download', ({ params }) =>
-    respond(
-      () => {
-        const file = backend.downloadSupportAssist(String(params.uuid), String(params.id));
-        return new HttpResponse(file.body, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Content-Disposition': `attachment; filename="${file.filename}"`,
-          },
-        });
-      },
-      { read: true },
-    ),
-  ),
 
   http.get('/api/nodes/:region/:uuid/console', ({ params }) =>
     respond(() => backend.getConsole(String(params.uuid)), { read: true }),

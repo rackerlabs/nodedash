@@ -55,13 +55,6 @@ const EnvSchema = z.object({
   /** Upper bound on projects returned to the picker before it switches to server search. */
   PROJECT_LIST_LIMIT: z.coerce.number().int().positive().default(2000),
   NODE_PAGE_SIZE: z.coerce.number().int().positive().default(500),
-  /**
-   * Optional allowlist of hosts a SupportAssist download may redirect to. Empty
-   * allows any http(s) host the conductor returns; pin it in production so a
-   * compromised or misconfigured conductor cannot turn the download endpoint into
-   * an open redirect.
-   */
-  SUPPORT_ASSIST_STORAGE_HOSTS: z.string().default(''),
   MAX_NODE_PAGES: z.coerce.number().int().positive().default(40),
 
   /**
@@ -187,9 +180,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     locateConcurrency: raw.LOCATE_CONCURRENCY,
     projectListLimit: raw.PROJECT_LIST_LIMIT,
     nodePageSize: raw.NODE_PAGE_SIZE,
-    supportAssistStorageHosts: raw.SUPPORT_ASSIST_STORAGE_HOSTS.split(',')
-      .map((host) => host.trim())
-      .filter(Boolean),
     maxNodePages: raw.MAX_NODE_PAGES,
     graphicalConsoleType: raw.GRAPHICAL_CONSOLE_TYPE || null,
     editableExtraFields: parseExtraFields(raw.EDITABLE_EXTRA_FIELDS),

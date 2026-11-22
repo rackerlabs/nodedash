@@ -34,12 +34,12 @@ import {
   RegionListSchema,
   ScopeOptionsSchema,
   SessionSchema,
-  SupportAssistCollectionListSchema,
-  SupportAssistCollectionSchema,
+  SupportAssistEulaSchema,
+  SupportAssistTaskSchema,
+  SupportAssistJobSchema,
   VendorPassthruMethodsSchema,
   type IronicNode,
   type PowerTarget,
-  type SupportAssistStartRequest,
 } from '@nodedash/shared';
 import { IS_MOCK } from '@/lib/env';
 import { ApiRequestError, request } from './client';
@@ -190,22 +190,21 @@ export const api = {
   vendorPassthruMethods: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/vendor-passthru/methods`, { schema: VendorPassthruMethodsSchema }),
 
-  supportAssist: (region: string, uuid: string) =>
-    request(`/nodes/${enc(region)}/${uuid}/support-assist`, { schema: SupportAssistCollectionListSchema }),
+  supportAssistEula: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/support-assist/eula`, { schema: SupportAssistEulaSchema }),
 
-  startSupportAssist: (region: string, uuid: string, body: SupportAssistStartRequest) =>
+  startSupportAssist: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/support-assist`, {
       method: 'POST',
-      body,
-      schema: SupportAssistCollectionSchema,
+      schema: SupportAssistTaskSchema,
     }),
 
-  /**
-   * A plain URL rather than a fetch: the bundle is large and the server answers
-   * with a redirect to storage, so the browser should own the download.
-   */
-  supportAssistDownloadUrl: (region: string, uuid: string, id: string) =>
-    `/api/nodes/${enc(region)}/${encodeURIComponent(uuid)}/support-assist/${encodeURIComponent(id)}/download`,
+  supportAssistJob: (region: string, uuid: string, task_monitor: string) =>
+    request(`/nodes/${enc(region)}/${uuid}/support-assist/job`, {
+      method: 'POST',
+      body: { task_monitor },
+      schema: SupportAssistJobSchema,
+    }),
 
   console: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/console`, { schema: NodeConsoleSchema }),

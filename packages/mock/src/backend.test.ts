@@ -353,123 +353,44 @@ function idracNode(nodes: ReturnType<typeof setupWithClock>['nodes']) {
 }
 
 describe('mock backend: SupportAssist', () => {
-  it('offers the passthru only on the idrac driver', () => {
-    const { backend, nodes } = setupWithClock();
-    const dellIdrac = idracNode(nodes);
-    const other = nodes.find((candidate) => candidate.driver !== 'idrac')!;
-
-    expect(backend.listSupportAssist(dellIdrac.uuid).supported).toBe(true);
-    expect(backend.listSupportAssist(other.uuid).supported).toBe(false);
-    expect(backend.listSupportAssist(other.uuid).collections).toEqual([]);
-  });
-
-  it('refuses to start a collection on a node whose driver cannot do it', () => {
+  it('rejects unsupported drivers and unaccepted EULA without accepting it', () => {
     const { backend, nodes } = setupWithClock();
     const other = nodes.find((candidate) => candidate.driver !== 'idrac')!;
-    expect(() =>
-      backend.startSupportAssist(other.uuid, { data_selectors: ['HWData'], filter_pii: true }),
-    ).toThrowError(/does not offer SupportAssist/);
-  });
-
-  it('requires at least one category of data', () => {
-    const { backend, nodes } = setupWithClock();
-    expect(() =>
-      backend.startSupportAssist(idracNode(nodes).uuid, { data_selectors: [], filter_pii: true }),
-    ).toThrowError(/at least one category/);
-  });
-
-  it('runs one collection at a time, as the BMC does', () => {
-    const { backend, nodes } = setupWithClock();
+    expect(() => backend.startSupportAssist(other.uuid)).toThrowError(/does not offer SupportAssist/);
     const node = idracNode(nodes);
-    backend.startSupportAssist(node.uuid, { data_selectors: ['HWData'], filter_pii: true });
-    expect(() =>
-      backend.startSupportAssist(node.uuid, { data_selectors: ['HWData'], filter_pii: true }),
-    ).toThrowError(/already running/);
+    backend.fixtures.supportAssistEula.set(node.uuid, false);
+    expect(backend.supportAssistEula(node.uuid).accepted).toBe(false);
+    expect(() => backend.startSupportAssist(node.uuid)).toThrowError(/EULA/);
+    expect(backend.supportAssistEula(node.uuid).accepted).toBe(false);
   });
 
-  it('moves through queued, collecting and uploading before it is available', () => {
+  it('returns a monitor and polls the job through completion, retaining the result', () => {
     const { backend, clock, scenario, nodes } = setupWithClock();
     const node = idracNode(nodes);
-    const started = backend.startSupportAssist(node.uuid, {
-      data_selectors: ['HWData', 'Debug'],
-      filter_pii: true,
-    });
-    expect(started.state).toBe('queued');
-
-    function stateNow(): string {
-      return backend.listSupportAssist(node.uuid).collections.find((c) => c.id === started.id)!.state;
-    }
-
+    const { task_monitor } = backend.startSupportAssist(node.uuid);
+    expect(backend.supportAssistJob(node.uuid, task_monitor).is_processing).toBe(true);
+    expect(() => backend.startSupportAssist(node.uuid)).toThrowError(/already running/);
     clock.now += scenario.supportAssistMs * 0.5;
-    expect(stateNow()).toBe('collecting');
-
-    clock.now += scenario.supportAssistMs * 0.45;
-    expect(stateNow()).toBe('uploading');
-
-    clock.now += scenario.supportAssistMs * 0.1;
-    expect(stateNow()).toBe('available');
-
-    const finished = backend
-      .listSupportAssist(node.uuid)
-      .collections.find((collection) => collection.id === started.id)!;
-    expect(finished.percent).toBe(100);
-    expect(finished.finished_at).toBeTruthy();
-    expect(finished.size_bytes).toBeGreaterThan(0);
-    // A bundle that can hold customer data gets a retention date, not permanence.
-    expect(finished.expires_at).toBeTruthy();
-  });
-
-  it('fails when OS data is requested from a node that is not powered on', () => {
-    const { backend, clock, scenario, nodes } = setupWithClock();
-    const node = nodes.find(
-      (candidate) => candidate.driver === 'idrac' && candidate.power_state !== 'power on',
-    );
-    if (!node) return; // fixture set happened to have none; nothing to assert
-
-    const started = backend.startSupportAssist(node.uuid, {
-      data_selectors: ['HWData', 'OSAppData'],
-      filter_pii: false,
+    expect(backend.supportAssistJob(node.uuid, task_monitor).percent_complete).toBe(50);
+    clock.now += scenario.supportAssistMs;
+    expect(backend.supportAssistJob(node.uuid, task_monitor)).toMatchObject({
+      is_processing: false,
+      task_state: 'Completed',
+      percent_complete: 100,
     });
-    clock.now += scenario.supportAssistMs + 1;
-
-    const finished = backend
-      .listSupportAssist(node.uuid)
-      .collections.find((collection) => collection.id === started.id)!;
-    expect(finished.state).toBe('failed');
-    expect(finished.error).toMatch(/not powered on/);
-    expect(() => backend.downloadSupportAssist(node.uuid, started.id)).toThrowError(/only a finished/);
+    expect(backend.supportAssistJob(node.uuid, task_monitor).is_processing).toBe(false);
+    expect(() => backend.supportAssistJob(node.uuid, '/unknown')).toThrowError(/Job not found/);
   });
 
-  it('downloads a finished bundle and refuses one that has expired', () => {
-    const { backend, nodes } = setupWithClock();
-    const node = nodes.find((candidate) =>
-      backend.fixtures.supportAssist
-        .get(candidate.uuid)
-        ?.some((collection) => collection.state === 'available'),
-    );
-    if (!node) return;
-
-    const available = backend.fixtures.supportAssist
-      .get(node.uuid)!
-      .find((collection) => collection.state === 'available')!;
-    const file = backend.downloadSupportAssist(node.uuid, available.id);
-    expect(file.body).toContain(node.uuid);
-    expect(file.filename).toMatch(/^MOCK-/);
-
-    const expired = backend.fixtures.supportAssist
-      .get(node.uuid)!
-      .find((collection) => collection.state === 'expired');
-    if (expired) {
-      expect(() => backend.downloadSupportAssist(node.uuid, expired.id)).toThrowError(/retention window/);
-    }
-  });
-
-  it('keeps collections scoped to the project that owns the node', () => {
+  it('keeps EULA and jobs scoped to the project that owns the node', () => {
     const { backend, nodes } = setupWithClock();
     const foreign = backend.fixtures.nodes.find(
       (candidate) => !nodes.some((visible) => visible.uuid === candidate.uuid),
     )!;
-    expect(() => backend.listSupportAssist(foreign.uuid)).toThrowError(/not found in this project/);
+    expect(() => backend.supportAssistEula(foreign.uuid)).toThrowError(/not found in this project/);
+    expect(() => backend.supportAssistJob(foreign.uuid, '/unknown')).toThrowError(
+      /not found in this project/,
+    );
   });
 });
 

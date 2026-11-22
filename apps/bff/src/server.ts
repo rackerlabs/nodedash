@@ -143,7 +143,7 @@ export async function buildServer() {
   registerAuthRoutes(app, config, keystone);
   registerScopeRoutes(app, config, keystone);
   registerNodeRoutes(app, config, keystone, ironic);
-  registerSupportAssistRoutes(app, config, keystone, ironic);
+  registerSupportAssistRoutes(app, keystone, ironic);
   registerDiagnosticsRoutes(app, keystone, ironic);
 
   if (config.staticDir) {
