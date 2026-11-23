@@ -22,6 +22,19 @@ import { z } from 'zod';
  * All deployment-specific values come from the environment. Nothing about a
  * particular OpenStack region is baked into the image.
  */
+const ArchiveStoreSchema = z.object({
+  url: z.url().refine((value) => {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash;
+  }),
+  username: z
+    .string()
+    .min(1)
+    .regex(/^[^:\r\n]+$/),
+  password: z.string().min(1),
+});
+const ArchiveStoresSchema = z.record(z.string(), ArchiveStoreSchema);
+
 const EnvSchema = z.object({
   HOST: z.string().default('127.0.0.1'),
   PORT: z.coerce.number().int().positive().default(8080),
@@ -55,13 +68,6 @@ const EnvSchema = z.object({
   /** Upper bound on projects returned to the picker before it switches to server search. */
   PROJECT_LIST_LIMIT: z.coerce.number().int().positive().default(2000),
   NODE_PAGE_SIZE: z.coerce.number().int().positive().default(500),
-  /**
-   * Optional allowlist of hosts a SupportAssist download may redirect to. Empty
-   * allows any http(s) host the conductor returns; pin it in production so a
-   * compromised or misconfigured conductor cannot turn the download endpoint into
-   * an open redirect.
-   */
-  SUPPORT_ASSIST_STORAGE_HOSTS: z.string().default(''),
   MAX_NODE_PAGES: z.coerce.number().int().positive().default(40),
 
   /**
@@ -78,6 +84,24 @@ const EnvSchema = z.object({
    * empty turns editing off.
    */
   EDITABLE_EXTRA_FIELDS: z.string().default(''),
+
+  /** JSON region -> { url, username, password }; inject from a Secret. */
+  SUPPORT_ASSIST_ARCHIVES: z
+    .string()
+    .default('{}')
+    .transform((value, ctx) => {
+      try {
+        const stores = ArchiveStoresSchema.safeParse(JSON.parse(value));
+        if (stores.success) return stores.data;
+      } catch {
+        /* Report the setting name without exposing credentials. */
+      }
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Expected a JSON region map with HTTPS url, username and password.',
+      });
+      return z.NEVER;
+    }),
 
   /** Name shown in the page title, header and sign-in page. */
   BRAND_NAME: z.string().min(1).default(DEFAULT_BRANDING.name),
@@ -187,12 +211,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     locateConcurrency: raw.LOCATE_CONCURRENCY,
     projectListLimit: raw.PROJECT_LIST_LIMIT,
     nodePageSize: raw.NODE_PAGE_SIZE,
-    supportAssistStorageHosts: raw.SUPPORT_ASSIST_STORAGE_HOSTS.split(',')
-      .map((host) => host.trim())
-      .filter(Boolean),
     maxNodePages: raw.MAX_NODE_PAGES,
     graphicalConsoleType: raw.GRAPHICAL_CONSOLE_TYPE || null,
     editableExtraFields: parseExtraFields(raw.EDITABLE_EXTRA_FIELDS),
+    supportAssistArchives: raw.SUPPORT_ASSIST_ARCHIVES,
     branding: { name: raw.BRAND_NAME, tagline: raw.BRAND_TAGLINE, logoUrl: raw.BRAND_LOGO_URL ?? null },
     // Static file serving needs an absolute root, so resolve it against the cwd.
     staticDir: raw.STATIC_DIR

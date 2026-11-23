@@ -43,7 +43,6 @@ config:
   # BRAND_NAME: nodedash
   # BRAND_TAGLINE: ""
   # BRAND_LOGO_URL: ""
-  # SUPPORT_ASSIST_STORAGE_HOSTS: ""
 
 # SESSION_KEYS encrypts the session cookie, which holds users' Keystone tokens.
 # The chart never takes the key itself: point it at an existing Secret, or let

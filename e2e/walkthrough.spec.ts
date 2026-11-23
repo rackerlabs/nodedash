@@ -364,7 +364,12 @@ test.describe('node detail', () => {
   test('sets and clears maintenance mode with a reason', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
-    await openFirstNode(page);
+    const uuid = await page.evaluate(() => {
+      const backend = window.__mockBackend!;
+      const project = backend.getSession().scope!.projectId;
+      return backend.fixtures.nodes.find((node) => node.owner === project && !node.maintenance)!.uuid;
+    });
+    await openNodeMatching(page, uuid);
 
     await page.getByRole('button', { name: 'Set maintenance' }).click();
     await page.getByRole('button', { name: 'Hardware fault, awaiting parts' }).click();
@@ -513,56 +518,113 @@ test.describe('SupportAssist', () => {
     });
   }
 
-  test('collects a bundle and offers it for download when it finishes', async ({ page }) => {
-    // Deliberately waits out a whole mock collection rather than stubbing the
-    // clock: the point of this test is that the polling actually carries a
-    // long-running job through to a downloadable result.
+  test('starts collection, polls the returned handle and lists a downloadable node archive', async ({
+    page,
+  }) => {
     test.setTimeout(120_000);
     await signIn(page);
     await chooseProject(page);
     await page.goto(`/nodes/lab-1/${await idracNodeUuid(page)}/support-assist`);
-
-    // This node may already have finished collections, so count them: the
-    // assertion has to be about the one this test starts, not any download link.
-    const downloads = page.getByRole('link', { name: 'Download' });
-    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled();
-    const before = await downloads.count();
-
+    await expect(page.getByText('Accepted', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Collect bundle' }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/HWData/)).toBeVisible();
     await dialog.getByRole('button', { name: 'Start collection' }).click();
-
-    // Runs on the BMC, so the page reports progress rather than blocking.
-    await expect(page.getByText(/Queued on the BMC|Collecting data from the node/)).toBeVisible();
+    await expect(page.getByText('Collection in progress. Checking every 10 seconds.')).toBeVisible();
+    await expect(page).toHaveURL(/task_monitor=/);
     await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeDisabled();
-
-    // The mock compresses the ~30 minute collection; see Scenario.supportAssistMs.
-    // Re-enabling is the page's own signal that nothing is running any more.
-    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled({
-      timeout: 90_000,
-    });
-    await expect(downloads).toHaveCount(before + 1);
+    // Leaving and returning keeps the monitor in the link without starting another job.
+    const task = new URL(page.url()).searchParams.get('task_monitor')!;
+    await page.getByRole('link', { name: 'Overview', exact: true }).click();
+    await page.getByRole('link', { name: 'SupportAssist', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Resume a job' }).fill(task);
+    await page.getByRole('button', { name: 'Poll job', exact: true }).click();
+    await expect(
+      page.getByText(
+        'Collection job completed. The archive list refreshes automatically; you can also refresh it manually.',
+      ),
+    ).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Refresh archives' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Modified', exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: '22 B', exact: true })).toBeVisible();
+    const downloadUrl = await page.getByRole('link', { name: 'Download', exact: true }).getAttribute('href');
+    expect(downloadUrl).toMatch(/\/support-assist\/archives\/TSR[0-9]{14}_[A-Za-z0-9]+\.zip$/);
+    // MSW skips native download navigation; verify its response via fetch instead.
+    // The BFF tests exercise the real HTTP attachment and streamed cancellation.
+    const archive = await page.evaluate(async (url) => {
+      const response = await fetch(url!);
+      return {
+        status: response.status,
+        disposition: response.headers.get('content-disposition'),
+        type: response.headers.get('content-type'),
+        body: Array.from(new Uint8Array(await response.arrayBuffer())),
+      };
+    }, downloadUrl);
+    expect(archive.status).toBe(200);
+    expect(archive.type).toBe('application/zip');
+    expect(archive.disposition).toMatch(/^attachment; filename="TSR[0-9]{14}_[A-Za-z0-9]+\.zip"$/);
+    expect(archive.body).toEqual([80, 75, 5, 6, ...Array(18).fill(0)]);
   });
 
-  test('requires an explicit acknowledgement before collecting unfiltered OS data', async ({ page }) => {
+  test('shows unconfigured archives as information while collection remains available', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    const uuid = await idracNodeUuid(page);
+    await page.evaluate(() => {
+      const original = window.fetch;
+      window.fetch = (input, init) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith('/support-assist/archives')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: {
+                  code: 'unsupported',
+                  message: 'Archive downloads are not configured for this region.',
+                },
+              }),
+              { status: 406, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return original(input, init);
+      };
+    });
+    await openNodeMatching(page, uuid);
+    await page.getByRole('link', { name: 'SupportAssist', exact: true }).click();
+    await expect(page.getByText('Archive downloads are not configured for this region.')).toBeVisible();
+    await expect(page.getByText('Could not list archives')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Refresh archives' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled();
+  });
+
+  test('shows unaccepted EULA and refreshes status without accepting it', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    const uuid = await idracNodeUuid(page);
+    await page.evaluate((uuid) => window.__mockBackend!.fixtures.supportAssistEula.set(uuid, false), uuid);
+    await openNodeMatching(page, uuid);
+    await page.getByRole('link', { name: 'SupportAssist', exact: true }).click();
+    await expect(page.getByText(/Not accepted\./)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeDisabled();
+    await page.evaluate((uuid) => window.__mockBackend!.fixtures.supportAssistEula.set(uuid, true), uuid);
+    await page.getByRole('button', { name: 'Refresh EULA status' }).click();
+    await expect(page.getByText('Accepted', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled();
+  });
+
+  test('surfaces an unknown job and rejects an invalid monitor', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);
     await page.goto(`/nodes/lab-1/${await idracNodeUuid(page)}/support-assist`);
-
-    await page.getByRole('button', { name: 'Collect bundle' }).click();
-    const dialog = page.getByRole('dialog');
-    const start = dialog.getByRole('button', { name: 'Start collection' });
-    await expect(start).toBeEnabled();
-
-    await dialog.getByText('OS and application data').click();
-    await dialog.getByText('Filter personally identifiable information').click();
-
-    await expect(dialog.getByText(/unfiltered data from the running host/)).toBeVisible();
-    await expect(start).toBeDisabled();
-
-    await dialog.getByText(/I have authorisation/).click();
-    await expect(start).toBeEnabled();
+    const input = page.getByRole('textbox', { name: 'Resume a job' });
+    await input.fill('https://other.example.com/job');
+    await expect(page.getByRole('button', { name: 'Poll job', exact: true })).toBeDisabled();
+    await input.fill('/redfish/v1/TaskService/Tasks/unknown');
+    await page.getByRole('button', { name: 'Poll job', exact: true }).click();
+    await expect(page.getByText('Could not poll collection job')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeDisabled();
   });
 
   test('hides the tab for hardware whose driver cannot collect one', async ({ page }) => {

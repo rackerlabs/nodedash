@@ -60,9 +60,9 @@ describe('vocabulary tones', () => {
   it('renders health, collection and severity vocabularies', () => {
     expect(healthTone('critical')).toBe('error');
     expect(healthTone('unknown')).toBe('neutral');
-    expect(supportAssistTone('collecting')).toBe('transient');
-    expect(supportAssistTone('available')).toBe('active');
-    expect(supportAssistTone('expired')).toBe('neutral');
+    expect(supportAssistTone('Running')).toBe('transient');
+    expect(supportAssistTone('Completed')).toBe('active');
+    expect(supportAssistTone('Unknown')).toBe('neutral');
     expect(historySeverityTone('ERROR')).toBe('error');
     expect(logSeverityTone('Critical')).toBe('error');
   });
