@@ -24,11 +24,8 @@ export const SUPPORT_ASSIST_METHODS = {
   job: 'get_job_status',
 } as const;
 
-export const SUPPORT_ASSIST_ARCHIVE_NAME = /^TSR[0-9]{14}_([A-Za-z0-9]+)\.zip$/;
-
-export function isSupportAssistArchiveFor(name: string, serial: string): boolean {
-  return SUPPORT_ASSIST_ARCHIVE_NAME.exec(name)?.[1] === serial;
-}
+// Require the whole filename, including rejection of a trailing newline.
+export const SUPPORT_ASSIST_ARCHIVE_NAME = /^TSR[0-9]{14}_[A-Za-z0-9]+\.zip(?![\s\S])/;
 
 export const SupportAssistArchivesSchema = z.array(
   z.object({

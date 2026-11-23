@@ -16,13 +16,13 @@ limitations under the License.
 
 import {
   SUPPORT_ASSIST_METHODS,
-  isSupportAssistArchiveFor,
-  type NodeInventory,
+  SUPPORT_ASSIST_ARCHIVE_NAME,
   SupportAssistTaskSchema,
   supportsSupportAssist,
   type VendorPassthruMethods,
 } from '@nodedash/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import { audit } from '../audit.ts';
 import type { Config } from '../config.ts';
 import { archiveResponse, listArchives } from '../support-assist-archives.ts';
@@ -83,6 +83,8 @@ export function registerSupportAssistRoutes(
   });
 
   async function archiveAccess(request: FastifyRequest<{ Params: NodeParams }>) {
+    const { uuid } = request.params;
+    if (!z.uuid().safeParse(uuid).success) throw badRequest('A node UUID is required for archive access.');
     const target = await ironicTarget(keystone, request);
     // Ironic checks baremetal:node:vendor_passthru here, on every request.
     if (!supportsSupportAssist(await methodsFor(target, request.params.uuid))) {
@@ -92,25 +94,20 @@ export function registerSupportAssistRoutes(
       ? config.supportAssistArchives[request.params.region]
       : undefined;
     if (!store) throw unsupported('Archive downloads are not configured for this region.');
-    const { capabilities } = await ironic.capabilities(target.endpoint);
-    if (!capabilities.inventory) throw unsupported('This Ironic API cannot expose node inventory.');
-    const node = await ironic.json<NodeInventory>(target, nodePath(request.params.uuid, '/inventory'));
-    const serial = node.inventory?.system_vendor?.serial_number;
-    if (!serial) throw unsupported('This node has no inventory serial number to identify its archives.');
-    return { store, serial };
+    return { store, uuid };
   }
 
   app.get<{ Params: NodeParams }>('/api/nodes/:region/:uuid/support-assist/archives', async (request) => {
-    const { store, serial } = await archiveAccess(request);
-    return listArchives(store, serial);
+    const { store, uuid } = await archiveAccess(request);
+    return listArchives(store, uuid);
   });
 
   app.get<{ Params: NodeParams & { name: string } }>(
     '/api/nodes/:region/:uuid/support-assist/archives/:name',
     async (request, reply) => {
-      const { store, serial } = await archiveAccess(request);
+      const { store, uuid } = await archiveAccess(request);
       const { name } = request.params;
-      if (!isSupportAssistArchiveFor(name, serial)) {
+      if (!SUPPORT_ASSIST_ARCHIVE_NAME.test(name)) {
         throw new HttpError(404, 'not_found', 'Archive not found for this node.');
       }
       const record = (outcome: 'requested' | 'succeeded' | 'failed') =>
@@ -129,7 +126,7 @@ export function registerSupportAssistRoutes(
       };
       let response;
       try {
-        response = await archiveResponse(store, name);
+        response = await archiveResponse(store, uuid, name);
       } catch (error) {
         finish('failed');
         throw error;

@@ -43,7 +43,8 @@ vi.mock('node:https', async () => {
 
 const archive = 'TSR20260102120000_ABC1234.zip';
 const monitor = '/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/Jobs/JID_123';
-const base = '/api/nodes/north1/node-1';
+const uuid = '12345678-1234-4234-8234-123456789abc';
+const base = `/api/nodes/north1/${uuid}`;
 const methods = Object.fromEntries(
   Object.entries(SUPPORT_ASSIST_METHODS).map(([key, name]) => [
     name,
@@ -60,7 +61,6 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
   let jobStatus: number;
   let vendorStatus: number;
   let storageStatus: number;
-  let serial: string | null;
   let streaming: boolean;
   let produced: number;
   let storageClosed: Promise<void>;
@@ -76,7 +76,6 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     jobStatus = 200;
     vendorStatus = 200;
     storageStatus = 200;
-    serial = 'ABC1234';
     streaming = false;
     produced = 0;
     storageClosed = new Promise((resolve) => {
@@ -93,7 +92,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
         });
         res.statusCode = storageStatus;
         if (storageStatus !== 200) return res.end('Storage error with sensitive details');
-        if (req.url === '/supportassist-archives/')
+        if (req.url === `/supportassist-archives/${uuid}/`)
           return res.end(
             JSON.stringify([
               { name: archive, type: 'file', mtime: 'Fri, 02 Jan 2026 12:00:00 GMT', size: 8 },
@@ -104,7 +103,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
                 size: 4,
               },
               {
-                name: 'TSR20260102120000_OTHER.zip',
+                name: 'TSR20260102120000_OTHER.zip.tmp',
                 type: 'file',
                 mtime: 'Fri, 02 Jan 2026 12:00:00 GMT',
                 size: 8,
@@ -113,6 +112,10 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
               { name: 'nested', type: 'directory', mtime: 'Fri, 02 Jan 2026 12:00:00 GMT' },
             ]),
           );
+        if (req.url !== `/supportassist-archives/${uuid}/${archive}`) {
+          res.statusCode = 404;
+          return res.end();
+        }
         if (streaming) {
           const chunk = Buffer.alloc(64 * 1024);
           const timer = setInterval(() => {
@@ -149,9 +152,10 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
             vendorStatus === 200 ? (supported ? methods : {}) : { error_message: 'Vendor access denied' },
           ),
         );
-      } else if (req.url?.endsWith('/inventory'))
-        res.end(JSON.stringify({ inventory: { system_vendor: { serial_number: serial } } }));
-      else if (req.url?.endsWith('/support_assist_get_eula_status'))
+      } else if (req.url?.endsWith('/inventory')) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error_message: 'Inspection failed' }));
+      } else if (req.url?.endsWith('/support_assist_get_eula_status'))
         res.end(JSON.stringify({ accepted: false }));
       else if (req.url?.endsWith('/support_assist_collect'))
         res.end(JSON.stringify({ task_monitor: monitor }));
@@ -227,7 +231,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
       );
   });
 
-  it('lists only the selected inventory serial, newest first, using storage credentials only', async () => {
+  it('lists the UUID directory without inventory, newest first, using storage credentials only', async () => {
     const response = await app.inject(`${base}/support-assist/archives`);
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([
@@ -237,11 +241,12 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     expect(calls.find((call) => call.path.endsWith('/methods'))?.token).toBe('user-scoped-token');
     expect(storageCalls).toEqual([
       {
-        path: '/supportassist-archives/',
+        path: `/supportassist-archives/${uuid}/`,
         auth: `Basic ${Buffer.from('reader:test-password').toString('base64')}`,
         token: undefined,
       },
     ]);
+    expect(calls.some((call) => call.path.endsWith('/inventory'))).toBe(false);
     expect(response.body).not.toContain('test-password');
   });
 
@@ -252,6 +257,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     expect(response.headers['content-disposition']).toBe(`attachment; filename="${archive}"`);
     expect(response.headers['content-length']).toBe('8');
     expect(response.rawPayload).toEqual(Buffer.from([0x50, 0x4b, 0, 1, 2, 3, 4, 5]));
+    expect(storageCalls.map((call) => call.path)).toEqual([`/supportassist-archives/${uuid}/${archive}`]);
     expect(vi.mocked(audit).mock.calls.map(([, entry]) => entry.outcome)).toEqual(['requested', 'succeeded']);
   });
 
@@ -288,21 +294,18 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     expect((await app.inject(`${base}/support-assist/archives/${archive}`)).statusCode).toBe(401);
   });
 
-  it('refuses cross-node names, encoded paths, missing serials and unsupported drivers before storage access', async () => {
+  it('refuses unsafe filenames and unsupported drivers before storage access', async () => {
     for (const name of [
-      'TSR20260102120000_OTHER.zip',
-      'TSR20260102120000_XABC1234.zip',
       '%2e%2e%2fsecret',
       archive + '%0d%0aX-Test:evil',
+      archive + '%0a',
       archive + '.tmp',
     ]) {
       expect((await app.inject(`${base}/support-assist/archives/${name}`)).statusCode).toBe(404);
     }
-    serial = null;
-    expect((await app.inject(`${base}/support-assist/archives`)).statusCode).toBe(406);
     supported = false;
     expect((await app.inject(`${base}/support-assist/archives/${archive}`)).statusCode).toBe(406);
-    expect((await app.inject(`/api/nodes/unknown/node-1/support-assist/archives`)).statusCode).toBe(404);
+    expect((await app.inject(`/api/nodes/unknown/${uuid}/support-assist/archives`)).statusCode).toBe(404);
     expect(storageCalls).toEqual([]);
   });
 
@@ -312,6 +315,47 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     expect(response.statusCode).toBe(406);
     expect(response.json()).toEqual({ error: 'Archive downloads are not configured for this region.' });
     expect(storageCalls).toEqual([]);
+  });
+
+  it('requires a UUID before using a node identifier as a storage directory', async () => {
+    for (const [value, status] of [
+      ['node-1', 400],
+      ['%2e%2e', 404], // The router normalizes dot segments before route matching.
+      ['ABC1234', 400],
+      ['%2e%2e%2fsecret', 400],
+    ] as const) {
+      for (const suffix of ['', `/${archive}`]) {
+        expect(
+          (await app.inject(`/api/nodes/north1/${value}/support-assist/archives${suffix}`)).statusCode,
+        ).toBe(status);
+      }
+    }
+    expect(storageCalls).toEqual([]);
+  });
+
+  it('keeps listing and downloads inside the authorized UUID directory', async () => {
+    const other = 'aaaaaaaa-0000-4000-a000-00000000000a';
+    const otherBase = `/api/nodes/north1/${other}/support-assist/archives`;
+    expect((await app.inject(otherBase)).json()).toEqual([]);
+    expect((await app.inject(`${otherBase}/${archive}`)).statusCode).toBe(404);
+    expect(storageCalls.map((call) => call.path)).toEqual([
+      `/supportassist-archives/${other}/`,
+      `/supportassist-archives/${other}/${archive}`,
+    ]);
+    vendorStatus = 403;
+    storageCalls = [];
+    for (const suffix of ['', `/${archive}`]) {
+      expect((await app.inject(`${otherBase}${suffix}`)).statusCode).toBe(403);
+    }
+    expect(storageCalls).toEqual([]);
+  });
+
+  it('returns an empty list for a missing node directory without trying the flat directory', async () => {
+    storageStatus = 404;
+    const response = await app.inject(`${base}/support-assist/archives`);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([]);
+    expect(storageCalls.map((call) => call.path)).toEqual([`/supportassist-archives/${uuid}/`]);
   });
 
   it('sanitizes storage errors and preserves a missing archive as 404', async () => {

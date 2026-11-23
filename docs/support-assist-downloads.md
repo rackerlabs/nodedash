@@ -8,8 +8,14 @@ Each list and download request calls Ironic's node vendor-method discovery endpo
 project-scoped token. That endpoint enforces `baremetal:node:vendor_passthru`. NodeDash does not duplicate
 role or ownership rules. Node visibility alone does not grant download access.
 
-The BFF reads `inventory.system_vendor.serial_number` from Ironic inventory and accepts only filenames
-matching `TSR<14 digits>_<serial>.zip` for that exact serial. This format was verified on iDRAC 9. Other
+The BFF lists only the selected Ironic node's `<node_uuid>/` directory beneath the configured archive
+URL. Configure Ironic's `[drac]support_assist_share_url` with a trailing `/{node_uuid}/`, for example
+`http://192.0.2.10/supportassist/{node_uuid}/`. Neither collection nor archive access requires inspection
+data. There is no fallback to serial directories or old flat-directory archives; a missing node
+directory shows an empty list. A re-enrolled node has a new UUID and a separate archive directory.
+Downloads use that same UUID directory and accept only filenames matching
+`TSR<14 digits>_<service tag>.zip`. iDRAC keeps its original filename; the service tag is not used to
+identify the node or authorize access. This format was verified on iDRAC 9. Other
 filename formats are not listed. Archives are not mapped to jobs: Ironic returns a task monitor but no
 archive filename. **Modified** is the stored file's modification time, not a verified collection time.
 
@@ -57,7 +63,10 @@ archive filename. **Modified** is the stored file's modification time, not a ver
 ## Verification
 
 - With vendor passthru permission, open an iDRAC node's SupportAssist tab and refresh archives.
-- Check filenames, modification times and sizes. Another node's serial must not appear.
+- Check filenames, modification times and sizes. Another node's UUID directory must not be accessed.
+- Verify collection, listing and downloads work when inspection data is unavailable.
+- Confirm storage requests use only `<node_uuid>/` and `<node_uuid>/<filename>`. Old flat-directory
+  archives must not appear; a node without its own directory must show an empty list.
 - Start a fresh collection and check that the archive list refreshes on completion without a click.
   Keep manual refresh available if the ZIP is not visible yet.
 - Download the expected ZIP and run `unzip -t <filename>.zip`. Job completion alone does not verify it.

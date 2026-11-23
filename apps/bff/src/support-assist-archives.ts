@@ -17,7 +17,7 @@ limitations under the License.
 import { request as httpsRequest } from 'node:https';
 import type { IncomingMessage } from 'node:http';
 import { z } from 'zod';
-import { isSupportAssistArchiveFor, type SupportAssistArchive } from '@nodedash/shared';
+import { SUPPORT_ASSIST_ARCHIVE_NAME, type SupportAssistArchive } from '@nodedash/shared';
 import type { Config } from './config.ts';
 import { HttpError } from './errors.ts';
 
@@ -26,9 +26,12 @@ const unavailable = () =>
   new HttpError(502, 'upstream_error', 'SupportAssist archive storage is unavailable.');
 
 /** No redirects or browser-provided URLs; storage credentials stay on this connection. */
-export function archiveResponse(store: ArchiveStore, name = ''): Promise<IncomingMessage> {
+export function archiveResponse(store: ArchiveStore, uuid: string, name = ''): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
-    const url = new URL(encodeURIComponent(name), store.url.replace(/\/?$/, '/'));
+    const url = new URL(
+      `${encodeURIComponent(uuid)}/${encodeURIComponent(name)}`,
+      store.url.replace(/\/?$/, '/'),
+    );
     const request = httpsRequest(
       url,
       {
@@ -64,9 +67,9 @@ const IndexSchema = z.array(
   }),
 );
 
-export async function listArchives(store: ArchiveStore, serial: string): Promise<SupportAssistArchive[]> {
-  const response = await archiveResponse(store);
+export async function listArchives(store: ArchiveStore, uuid: string): Promise<SupportAssistArchive[]> {
   try {
+    const response = await archiveResponse(store, uuid);
     const chunks: Buffer[] = [];
     for await (const chunk of response) chunks.push(Buffer.from(chunk));
     const entries = IndexSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));
@@ -76,12 +79,14 @@ export async function listArchives(store: ArchiveStore, serial: string): Promise
         return entry.type === 'file' &&
           entry.size !== undefined &&
           !Number.isNaN(modified.getTime()) &&
-          isSupportAssistArchiveFor(entry.name, serial)
+          SUPPORT_ASSIST_ARCHIVE_NAME.test(entry.name)
           ? [{ name: entry.name, size: entry.size, modified: modified.toISOString() }]
           : [];
       })
       .sort((a, b) => b.modified.localeCompare(a.modified) || b.name.localeCompare(a.name));
-  } catch {
+  } catch (error) {
+    // No collection has been uploaded for this node yet.
+    if (error instanceof HttpError && error.status === 404) return [];
     throw unavailable();
   }
 }
