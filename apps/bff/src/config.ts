@@ -22,6 +22,16 @@ import { z } from 'zod';
  * All deployment-specific values come from the environment. Nothing about a
  * particular OpenStack region is baked into the image.
  */
+function isArchiveUrl(value: string): boolean {
+  if (!value.includes('{region}')) return false;
+  try {
+    const url = new URL(value.replaceAll('{region}', 'region'));
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
 const EnvSchema = z.object({
   HOST: z.string().default('127.0.0.1'),
   PORT: z.coerce.number().int().positive().default(8080),
@@ -55,13 +65,6 @@ const EnvSchema = z.object({
   /** Upper bound on projects returned to the picker before it switches to server search. */
   PROJECT_LIST_LIMIT: z.coerce.number().int().positive().default(2000),
   NODE_PAGE_SIZE: z.coerce.number().int().positive().default(500),
-  /**
-   * Optional allowlist of hosts a SupportAssist download may redirect to. Empty
-   * allows any http(s) host the conductor returns; pin it in production so a
-   * compromised or misconfigured conductor cannot turn the download endpoint into
-   * an open redirect.
-   */
-  SUPPORT_ASSIST_STORAGE_HOSTS: z.string().default(''),
   MAX_NODE_PAGES: z.coerce.number().int().positive().default(40),
 
   /**
@@ -78,6 +81,24 @@ const EnvSchema = z.object({
    * empty turns editing off.
    */
   EDITABLE_EXTRA_FIELDS: z.string().default(''),
+
+  /**
+   * Archive storage URL with a {region} placeholder, e.g.
+   * https://cdn.{region}.example.com/supportassist-archives/. Empty turns archive access off.
+   */
+  SUPPORT_ASSIST_ARCHIVE_URL: z
+    .string()
+    .default('')
+    .refine(
+      (value) => !value || isArchiveUrl(value),
+      'Expected an HTTPS URL containing {region}, without credentials, query or fragment.',
+    ),
+  /** One reader credential shared by every region's storage; inject from a Secret. */
+  SUPPORT_ASSIST_ARCHIVE_USERNAME: z
+    .string()
+    .regex(/^[^:\r\n]*$/, 'May not contain ":" or line breaks.')
+    .default(''),
+  SUPPORT_ASSIST_ARCHIVE_PASSWORD: z.string().default(''),
 
   /** Name shown in the page title, header and sign-in page. */
   BRAND_NAME: z.string().min(1).default(DEFAULT_BRANDING.name),
@@ -139,6 +160,24 @@ function parseExtraFields(raw: string): string[] {
   return [...new Set(fields)];
 }
 
+function parseArchiveStore(raw: {
+  SUPPORT_ASSIST_ARCHIVE_URL: string;
+  SUPPORT_ASSIST_ARCHIVE_USERNAME: string;
+  SUPPORT_ASSIST_ARCHIVE_PASSWORD: string;
+}) {
+  if (!raw.SUPPORT_ASSIST_ARCHIVE_URL) return null;
+  if (!raw.SUPPORT_ASSIST_ARCHIVE_USERNAME || !raw.SUPPORT_ASSIST_ARCHIVE_PASSWORD) {
+    throw new Error(
+      'Invalid environment configuration:\n  SUPPORT_ASSIST_ARCHIVE_URL: requires SUPPORT_ASSIST_ARCHIVE_USERNAME and SUPPORT_ASSIST_ARCHIVE_PASSWORD',
+    );
+  }
+  return {
+    url: raw.SUPPORT_ASSIST_ARCHIVE_URL,
+    username: raw.SUPPORT_ASSIST_ARCHIVE_USERNAME,
+    password: raw.SUPPORT_ASSIST_ARCHIVE_PASSWORD,
+  };
+}
+
 /** libsodium secretbox keys are exactly this long. */
 const SESSION_KEY_BYTES = 32;
 
@@ -187,12 +226,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     locateConcurrency: raw.LOCATE_CONCURRENCY,
     projectListLimit: raw.PROJECT_LIST_LIMIT,
     nodePageSize: raw.NODE_PAGE_SIZE,
-    supportAssistStorageHosts: raw.SUPPORT_ASSIST_STORAGE_HOSTS.split(',')
-      .map((host) => host.trim())
-      .filter(Boolean),
     maxNodePages: raw.MAX_NODE_PAGES,
     graphicalConsoleType: raw.GRAPHICAL_CONSOLE_TYPE || null,
     editableExtraFields: parseExtraFields(raw.EDITABLE_EXTRA_FIELDS),
+    supportAssistArchive: parseArchiveStore(raw),
     branding: { name: raw.BRAND_NAME, tagline: raw.BRAND_TAGLINE, logoUrl: raw.BRAND_LOGO_URL ?? null },
     // Static file serving needs an absolute root, so resolve it against the cwd.
     staticDir: raw.STATIC_DIR
