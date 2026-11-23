@@ -20,6 +20,8 @@ import {
   type CapabilityReport,
   type IronicNode,
 } from '@nodedash/shared';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import type { Config } from './config.ts';
 import { fromUpstream } from './errors.ts';
 import { redactSecrets } from './redact.ts';
@@ -41,6 +43,30 @@ export interface IronicTarget {
 }
 
 type RequestInit = { method?: string; body?: unknown; query?: Record<string, string | number | undefined> };
+
+async function fetchText(url: URL, init: globalThis.RequestInit) {
+  const response = await fetch(url, init);
+  return { status: response.status, text: await response.text() };
+}
+
+function getWithBody(url: URL, headers: Record<string, string>, payload: string) {
+  return new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const send = url.protocol === 'https:' ? httpsRequest : httpRequest;
+    const request = send(
+      url,
+      { method: 'GET', headers: { ...headers, 'Content-Length': Buffer.byteLength(payload) } },
+      (response) => {
+        response.setEncoding('utf8');
+        let text = '';
+        response.on('data', (chunk: string) => (text += chunk));
+        response.on('end', () => resolve({ status: response.statusCode ?? 502, text }));
+        response.on('error', reject);
+      },
+    );
+    request.on('error', reject);
+    request.end(payload);
+  });
+}
 
 export class IronicClient {
   /**
@@ -89,20 +115,20 @@ export class IronicClient {
     };
     if (init.body !== undefined) headers['Content-Type'] = 'application/json';
 
-    const response = await fetch(url, {
-      method: init.method ?? 'GET',
-      headers,
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    });
-
-    const text = await response.text();
+    const method = init.method ?? 'GET';
+    const payload = init.body === undefined ? undefined : JSON.stringify(init.body);
+    // Fetch forbids GET bodies, but Ironic vendor passthru requires JSON arguments.
+    const { status, text } =
+      method === 'GET' && payload !== undefined
+        ? await getWithBody(url, headers, payload)
+        : await fetchText(url, { method, headers, body: payload });
     let body: unknown = null;
     try {
       body = text ? JSON.parse(text) : null;
     } catch {
       body = text;
     }
-    return { status: response.status, body, text };
+    return { status, body, text };
   }
 
   /** Request that throws our HttpError on any non-2xx, with the upstream message. */

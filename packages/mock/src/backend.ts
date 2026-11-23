@@ -24,6 +24,7 @@ import {
   supportsSupportAssist,
   toNodeRow,
   type ApiErrorCode,
+  type SupportAssistArchive,
   type CapabilitiesResponse,
   type IronicNode,
   type LocateResult,
@@ -40,17 +41,10 @@ import {
   type ScopeOptions,
   type RegionList,
   type Session,
-  type SupportAssistCollection,
-  type SupportAssistStartRequest,
+  type SupportAssistJob,
   type VendorPassthruMethods,
 } from '@nodedash/shared';
-import {
-  buildFixtures,
-  supportAssistFilename,
-  withPortLldp,
-  vendorPassthruMethodsFor,
-  type Fixtures,
-} from './fixtures.ts';
+import { buildFixtures, withPortLldp, vendorPassthruMethodsFor, type Fixtures } from './fixtures.ts';
 import type { Scenario } from './scenarios.ts';
 
 export class MockApiError extends Error {
@@ -89,16 +83,11 @@ interface ServiceRun {
   willFail: boolean;
 }
 
-interface SupportAssistJob {
-  collectionId: string;
+interface PendingSupportAssistJob {
+  taskMonitor: string;
   startedAt: number;
   completeAt: number;
-  willFail: boolean;
-  failure: string | null;
 }
-
-/** Fractions of the run spent queued and spent uploading, either end of collecting. */
-const SUPPORT_ASSIST_PHASES = { queued: 0.05, uploading: 0.88 };
 
 /**
  * Sign-in state the mock keeps across reloads. A real deployment holds this in its
@@ -162,9 +151,10 @@ export interface MockBackend {
     serviceId: string,
     query: { limit?: number; marker?: string; severity?: string },
   ): { entries: LogEntry[]; next: string | null };
-  listSupportAssist(uuid: string): { collections: SupportAssistCollection[]; supported: boolean };
-  startSupportAssist(uuid: string, request: SupportAssistStartRequest): SupportAssistCollection;
-  downloadSupportAssist(uuid: string, id: string): { filename: string; body: string };
+  supportAssistArchives(uuid: string): SupportAssistArchive[];
+  supportAssistEula(uuid: string): { accepted: boolean };
+  startSupportAssist(uuid: string): { task_monitor: string };
+  supportAssistJob(uuid: string, taskMonitor: string): SupportAssistJob;
   shouldFailRead(): boolean;
   assertMutationAllowed(): void;
   latencyMs(): number;
@@ -188,8 +178,8 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
   const pendingPower = new Map<string, PendingPower>();
   const consoles = new Map<string, ConsoleState>();
   const serviceRuns = new Map<string, ServiceRun>();
-  /** At most one collection at a time per node, which is also the BMC's limit. */
-  const supportAssistJobs = new Map<string, SupportAssistJob>();
+  /** Retain completed jobs and archives; only one collection may run per node. */
+  const supportAssistJobs = new Map<string, PendingSupportAssistJob[]>();
 
   const mockUser = {
     id: '9f2c1d8e4b7a4c6f8d1e2a3b4c5d6e7f',
@@ -284,41 +274,6 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
         if (node) node.console_enabled = true;
       }
     }
-    for (const [uuid, job] of supportAssistJobs) {
-      const collection = (fixtures.supportAssist.get(uuid) ?? []).find(
-        (candidate) => candidate.id === job.collectionId,
-      );
-      if (!collection) {
-        supportAssistJobs.delete(uuid);
-        continue;
-      }
-
-      const fraction = Math.min(1, (timestamp - job.startedAt) / (job.completeAt - job.startedAt));
-      if (fraction < 1) {
-        collection.percent = Math.round(fraction * 100);
-        collection.state =
-          fraction < SUPPORT_ASSIST_PHASES.queued
-            ? 'queued'
-            : fraction < SUPPORT_ASSIST_PHASES.uploading
-              ? 'collecting'
-              : 'uploading';
-        continue;
-      }
-
-      supportAssistJobs.delete(uuid);
-      collection.finished_at = new Date(timestamp).toISOString();
-      if (job.willFail) {
-        collection.state = 'failed';
-        collection.percent = null;
-        collection.error = job.failure;
-      } else {
-        collection.state = 'available';
-        collection.percent = 100;
-        collection.size_bytes = (24 + Math.floor(Math.random() * 160)) * 1024 * 1024;
-        collection.expires_at = new Date(timestamp + 14 * 86_400_000).toISOString();
-      }
-    }
-
     for (const [uuid, run] of serviceRuns) {
       if (run.completeAt > timestamp) continue;
       const node = nodesByUuid.get(uuid);
@@ -742,116 +697,75 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
       };
     },
 
-    listSupportAssist(uuid: string) {
-      const node = nodeInScope(uuid);
-      const supported = supportsSupportAssist(vendorPassthruMethodsFor(node.driver));
-      if (!supported) return { collections: [], supported: false };
-      return { collections: fixtures.supportAssist.get(node.uuid) ?? [], supported: true };
-    },
-
-    startSupportAssist(uuid: string, request: SupportAssistStartRequest) {
+    supportAssistArchives(uuid: string) {
       const node = nodeInScope(uuid);
       if (!supportsSupportAssist(vendorPassthruMethodsFor(node.driver))) {
-        throw new MockApiError(
-          406,
-          'unsupported',
-          `Driver ${node.driver ?? 'unknown'} does not offer SupportAssist. Only Dell nodes on the idrac hardware type can collect one.`,
-        );
+        throw new MockApiError(406, 'unsupported', 'Driver does not offer SupportAssist.');
       }
-      if (!request.data_selectors || request.data_selectors.length === 0) {
-        throw new MockApiError(400, 'bad_request', 'Select at least one category of data to collect.');
-      }
-      if (supportAssistJobs.has(node.uuid)) {
-        throw new MockApiError(
-          409,
-          'conflict',
-          'A SupportAssist collection is already running on this node. The BMC will only run one at a time.',
-        );
-      }
-
-      const startedAt = now();
-      // Asking the BMC for OS-side data needs a running host to talk to, so this
-      // is the failure DC operators will actually hit.
-      const needsRunningHost = request.data_selectors.includes('OSAppData');
-      const willFail = needsRunningHost && node.power_state !== 'power on';
-
-      const collection: SupportAssistCollection = {
-        id: `${node.uuid.slice(0, 8)}-${startedAt.toString(36)}`,
-        state: 'queued',
-        percent: 0,
-        started_at: new Date(startedAt).toISOString(),
-        finished_at: null,
-        estimated_completion_at: new Date(startedAt + scenario.supportAssistMs).toISOString(),
-        requested_by: session.user?.name ?? 'unknown',
-        data_selectors: [...request.data_selectors],
-        filter_pii: request.filter_pii,
-        filename: supportAssistFilename(node, new Date(startedAt).toISOString()),
-        size_bytes: null,
-        expires_at: null,
-        error: null,
-      };
-
-      const existing = fixtures.supportAssist.get(node.uuid) ?? [];
-      // Newest first, which is the order the UI renders.
-      fixtures.supportAssist.set(node.uuid, [collection, ...existing]);
-      supportAssistJobs.set(node.uuid, {
-        collectionId: collection.id,
-        startedAt,
-        completeAt: startedAt + scenario.supportAssistMs,
-        willFail,
-        failure: willFail
-          ? 'OS Collector could not reach the host agent: the node is not powered on, so OS and application data could not be gathered.'
-          : null,
-      });
-
-      return collection;
+      return (supportAssistJobs.get(uuid) ?? [])
+        .filter((job) => job.completeAt <= now())
+        .reverse()
+        .map((job) => {
+          const modified = new Date(job.completeAt).toISOString();
+          return {
+            name: `TSR${modified.replace(/[^0-9]/g, '').slice(0, 14)}_${uuid.slice(0, 7).toUpperCase()}.zip`,
+            modified,
+            size: 22,
+          };
+        });
     },
 
-    downloadSupportAssist(uuid: string, id: string) {
+    supportAssistEula(uuid: string) {
       const node = nodeInScope(uuid);
-      const collection = (fixtures.supportAssist.get(node.uuid) ?? []).find(
-        (candidate) => candidate.id === id,
-      );
-      if (!collection) {
-        throw new MockApiError(404, 'not_found', `No SupportAssist collection ${id} for this node.`);
+      if (!supportsSupportAssist(vendorPassthruMethodsFor(node.driver))) {
+        throw new MockApiError(406, 'unsupported', 'Driver does not offer SupportAssist.');
       }
-      if (collection.state === 'expired') {
-        throw new MockApiError(
-          410,
-          'not_found',
-          'This bundle has passed its retention window and been deleted from storage.',
-        );
-      }
-      if (collection.state !== 'available') {
-        throw new MockApiError(
-          409,
-          'conflict',
-          `This collection is ${collection.state}; only a finished collection can be downloaded.`,
-        );
-      }
+      return { accepted: fixtures.supportAssistEula.get(uuid) ?? true };
+    },
 
-      // The real bundle is a multi-hundred-megabyte archive straight from the BMC.
-      // The mock hands back a readable placeholder so the download path is
-      // reviewable without inventing a fake tarball.
-      const body = [
-        'MOCK SupportAssist bundle -- not real hardware data.',
-        '',
-        `node.name            ${node.name ?? '(unnamed)'}`,
-        `node.uuid            ${node.uuid}`,
-        `node.driver          ${node.driver ?? 'unknown'}`,
-        `collection.id        ${collection.id}`,
-        `started_at           ${collection.started_at}`,
-        `finished_at          ${collection.finished_at ?? '(unfinished)'}`,
-        `data_selectors       ${collection.data_selectors.join(', ')}`,
-        `filter_pii           ${collection.filter_pii}`,
-        `reported_size_bytes  ${collection.size_bytes ?? 0}`,
-        `expires_at           ${collection.expires_at ?? '(no retention set)'}`,
-        '',
-        'A real collection arrives as the .tar.gz the BMC produced, streamed from',
-        'object storage. Ironic reports the filename above.',
-      ].join('\n');
+    startSupportAssist(uuid: string) {
+      const node = nodeInScope(uuid);
+      if (!supportsSupportAssist(vendorPassthruMethodsFor(node.driver))) {
+        throw new MockApiError(406, 'unsupported', 'Driver does not offer SupportAssist.');
+      }
+      if (fixtures.supportAssistEula.get(uuid) === false) {
+        throw new MockApiError(400, 'bad_request', 'SupportAssist EULA has not been accepted.');
+      }
+      const jobs = supportAssistJobs.get(uuid) ?? [];
+      const existing = jobs.at(-1);
+      if (existing && existing.completeAt > now()) {
+        throw new MockApiError(409, 'conflict', 'A SupportAssist collection is already running.');
+      }
+      const startedAt = now();
+      const taskMonitor = `/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/Jobs/JID_${startedAt}`;
+      jobs.push({
+        taskMonitor,
+        startedAt,
+        completeAt: startedAt + scenario.supportAssistMs,
+      });
+      supportAssistJobs.set(uuid, jobs);
+      return { task_monitor: taskMonitor };
+    },
 
-      return { filename: `MOCK-${collection.filename ?? 'supportassist'}.txt`, body };
+    supportAssistJob(uuid: string, taskMonitor: string) {
+      nodeInScope(uuid);
+      const job = supportAssistJobs.get(uuid)?.find((job) => job.taskMonitor === taskMonitor);
+      if (!job) {
+        throw new MockApiError(404, 'not_found', 'Job not found.');
+      }
+      const fraction = Math.min(1, (now() - job.startedAt) / (job.completeAt - job.startedAt));
+      const state = fraction < 1 ? 'Running' : 'Completed';
+      return {
+        task_monitor: taskMonitor,
+        is_processing: fraction < 1,
+        task_state: state,
+        task_status: 'OK',
+        job_state: state,
+        percent_complete: Math.round(fraction * 100),
+        messages: [
+          { Message: fraction < 1 ? 'Collecting SupportAssist data.' : 'Collection completed successfully.' },
+        ],
+      };
     },
   };
 }

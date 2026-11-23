@@ -29,11 +29,7 @@ import { ConsoleButton } from '@/features/node/console-button';
 import { ClearMaintenanceDialog, MaintenanceDialog } from '@/features/node/maintenance-dialog';
 import { PowerMenu } from '@/features/node/power-menu';
 import { useResolvedNode } from '@/features/node/use-node';
-import {
-  activeCollection,
-  useSupportAssist,
-  useSupportAssistSupported,
-} from '@/features/node/use-support-assist';
+import { useSupportAssistSupported } from '@/features/node/use-support-assist';
 import { ScopePickerDialog } from '@/features/scope/scope-picker';
 import { formatCount } from '@/lib/format';
 import { useRegionPaths } from '@/lib/paths';
@@ -75,10 +71,6 @@ export function NodeLayout() {
   const { supported: supportAssistSupported } = useSupportAssistSupported(uuid, {
     enabled: phase === 'ready',
   });
-  // Shares its query key with the tab itself, so this costs no extra request and
-  // surfaces a running collection while the operator is on another tab.
-  const supportAssist = useSupportAssist(uuid, { enabled: supportAssistSupported });
-  const collecting = activeCollection(supportAssist.query.data?.collections) !== null;
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -232,9 +224,6 @@ export function NodeLayout() {
                   }
                 >
                   {tab.label}
-                  {tab.driverGated && collecting ? (
-                    <Spinner className="ml-1.5 inline size-3 align-[-1px]" />
-                  ) : null}
                 </NavLink>
               );
             })}
