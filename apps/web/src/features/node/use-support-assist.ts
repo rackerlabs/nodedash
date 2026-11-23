@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supportsSupportAssist } from '@nodedash/shared';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
@@ -34,10 +35,17 @@ export function useSupportAssistSupported(uuid: string, options: { enabled?: boo
 
 export function useSupportAssist(uuid: string, options: { enabled: boolean; taskMonitor: string }) {
   const region = useRegion();
+  const queryClient = useQueryClient();
   const key = qk.supportAssist(region, uuid);
   const eula = useQuery({
     queryKey: [...key, 'eula'],
     queryFn: () => api.supportAssistEula(region, uuid),
+    enabled: options.enabled,
+    retry: false,
+  });
+  const archives = useQuery({
+    queryKey: [...key, 'archives'],
+    queryFn: () => api.supportAssistArchives(region, uuid),
     enabled: options.enabled,
     retry: false,
   });
@@ -49,6 +57,12 @@ export function useSupportAssist(uuid: string, options: { enabled: boolean; task
     refetchInterval: (query) => (query.state.data?.is_processing && !query.state.error ? 10_000 : false),
     refetchIntervalInBackground: true,
   });
+  const completed = !job.data?.is_processing && (job.data?.task_state ?? job.data?.job_state) === 'Completed';
+  useEffect(() => {
+    if (options.enabled && options.taskMonitor && completed) {
+      void queryClient.invalidateQueries({ queryKey: [...qk.supportAssist(region, uuid), 'archives'] });
+    }
+  }, [queryClient, region, uuid, options.enabled, options.taskMonitor, completed]);
   const start = useMutation({ mutationFn: () => api.startSupportAssist(region, uuid) });
-  return { eula, job, start };
+  return { eula, job, start, archives };
 }

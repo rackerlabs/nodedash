@@ -72,6 +72,41 @@ const EnvSchema = z.object({
    */
   EDITABLE_EXTRA_FIELDS: z.string().default(''),
 
+  /** JSON region -> { url, username, password }; inject from a Secret. */
+  SUPPORT_ASSIST_ARCHIVES: z
+    .string()
+    .default('{}')
+    .transform((value, ctx) => {
+      try {
+        const stores = z
+          .record(
+            z.string(),
+            z.object({
+              url: z.url().refine((value) => {
+                const url = new URL(value);
+                return (
+                  url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash
+                );
+              }),
+              username: z
+                .string()
+                .min(1)
+                .regex(/^[^:\r\n]+$/),
+              password: z.string().min(1),
+            }),
+          )
+          .safeParse(JSON.parse(value));
+        if (stores.success) return stores.data;
+      } catch {
+        /* Report the setting name without exposing credentials. */
+      }
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Expected a JSON region map with HTTPS url, username and password.',
+      });
+      return z.NEVER;
+    }),
+
   /** Name shown in the page title, header and sign-in page. */
   BRAND_NAME: z.string().min(1).default(DEFAULT_BRANDING.name),
   BRAND_TAGLINE: z.string().default(DEFAULT_BRANDING.tagline),
@@ -183,6 +218,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     maxNodePages: raw.MAX_NODE_PAGES,
     graphicalConsoleType: raw.GRAPHICAL_CONSOLE_TYPE || null,
     editableExtraFields: parseExtraFields(raw.EDITABLE_EXTRA_FIELDS),
+    supportAssistArchives: raw.SUPPORT_ASSIST_ARCHIVES,
     branding: { name: raw.BRAND_NAME, tagline: raw.BRAND_TAGLINE, logoUrl: raw.BRAND_LOGO_URL ?? null },
     // Static file serving needs an absolute root, so resolve it against the cwd.
     staticDir: raw.STATIC_DIR

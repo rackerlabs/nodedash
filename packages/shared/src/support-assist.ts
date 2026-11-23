@@ -24,6 +24,21 @@ export const SUPPORT_ASSIST_METHODS = {
   job: 'get_job_status',
 } as const;
 
+export const SUPPORT_ASSIST_ARCHIVE_NAME = /^TSR[0-9]{14}_([A-Za-z0-9]+)\.zip$/;
+
+export function isSupportAssistArchiveFor(name: string, serial: string): boolean {
+  return SUPPORT_ASSIST_ARCHIVE_NAME.exec(name)?.[1] === serial;
+}
+
+export const SupportAssistArchivesSchema = z.array(
+  z.object({
+    name: z.string().regex(SUPPORT_ASSIST_ARCHIVE_NAME),
+    modified: z.iso.datetime(),
+    size: z.number().int().nonnegative(),
+  }),
+);
+export type SupportAssistArchive = z.infer<typeof SupportAssistArchivesSchema>[number];
+
 export const SupportAssistEulaSchema = z.object({ accepted: z.boolean() });
 export const SupportAssistTaskSchema = z.object({
   task_monitor: z

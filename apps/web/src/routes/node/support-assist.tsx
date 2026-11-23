@@ -32,20 +32,26 @@ import {
 } from '@/components/ui/dialog';
 import { Empty, Progress, Skeleton, Spinner } from '@/components/ui/misc';
 import { useSupportAssist, useSupportAssistSupported } from '@/features/node/use-support-assist';
-import { errorMessage } from '@/lib/api/client';
+import { api } from '@/lib/api/endpoints';
+import { useRegion } from '@/lib/paths';
+import { formatBytes, formatTimestamp } from '@/lib/format';
+import { ApiRequestError, errorMessage } from '@/lib/api/client';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
 
 export function NodeSupportAssistPage() {
+  const region = useRegion();
   const { row } = useNodeContext();
   const capability = useSupportAssistSupported(row.uuid);
   const [params, setParams] = useSearchParams();
   const taskMonitor = params.get('task_monitor') ?? '';
   const validTask = SupportAssistTaskSchema.safeParse({ task_monitor: taskMonitor }).success;
-  const { eula, job, start } = useSupportAssist(row.uuid, {
+  const { eula, job, start, archives } = useSupportAssist(row.uuid, {
     enabled: capability.supported,
     taskMonitor: validTask ? taskMonitor : '',
   });
+  const archivesUnavailable =
+    archives.error instanceof ApiRequestError && archives.error.code === 'unsupported';
   const [resume, setResume] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   function track(task_monitor: string) {
@@ -145,7 +151,7 @@ export function NodeSupportAssistPage() {
                 ) : (
                   <p>
                     {status === 'Completed'
-                      ? 'Collection job completed. Verify the uploaded archive through Kubernetes.'
+                      ? 'Collection job completed. The archive list refreshes automatically; you can also refresh it manually.'
                       : 'Collection job stopped. Review the status and messages below.'}
                   </p>
                 )}
@@ -200,10 +206,77 @@ export function NodeSupportAssistPage() {
           Poll job
         </Button>
       </form>
-      <p className="text-sm text-muted-foreground">
-        Downloads remain through Kubernetes: ask an authorised operator to locate and copy the uploaded ZIP
-        from the CDN’s SupportAssist volume. Job completion alone does not verify the archive.
-      </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Archives for this node</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Stored ZIPs for this node’s inventory serial number. Modified times show when files were stored;
+            archives are not linked to individual jobs. Downloading does not verify ZIP integrity.
+          </p>
+          {archives.isPending ? (
+            <Spinner />
+          ) : archivesUnavailable ? (
+            <p className="text-sm text-muted-foreground">{errorMessage(archives.error)}</p>
+          ) : archives.isError ? (
+            <ErrorPanel
+              title="Could not list archives"
+              error={archives.error}
+              onRetry={() => void archives.refetch()}
+            />
+          ) : archives.data.length === 0 ? (
+            <p>No archives found for this node.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr>
+                    <th>Archive</th>
+                    <th>Modified</th>
+                    <th>Size</th>
+                    <th>
+                      <span className="sr-only">Download</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archives.data.map((archive) => (
+                    <tr key={archive.name}>
+                      <td className="py-2 pr-4 font-mono text-xs">{archive.name}</td>
+                      <td className="pr-4">
+                        <time dateTime={archive.modified}>{formatTimestamp(archive.modified)}</time>
+                      </td>
+                      <td className="pr-4 whitespace-nowrap" title={`${archive.size.toLocaleString()} bytes`}>
+                        {formatBytes(archive.size)}
+                      </td>
+                      <td>
+                        <a
+                          className="text-primary underline"
+                          href={api.supportAssistDownloadUrl(region, row.uuid, archive.name)}
+                          download
+                        >
+                          Download
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {!archivesUnavailable && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={archives.isFetching}
+              onClick={() => void archives.refetch()}
+            >
+              Refresh archives
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

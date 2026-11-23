@@ -518,7 +518,7 @@ test.describe('SupportAssist', () => {
     });
   }
 
-  test('starts collection, polls the returned handle and keeps downloads through Kubernetes', async ({
+  test('starts collection, polls the returned handle and lists a downloadable node archive', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -540,11 +540,63 @@ test.describe('SupportAssist', () => {
     await page.getByRole('textbox', { name: 'Resume a job' }).fill(task);
     await page.getByRole('button', { name: 'Poll job', exact: true }).click();
     await expect(
-      page.getByText('Collection job completed. Verify the uploaded archive through Kubernetes.'),
+      page.getByText(
+        'Collection job completed. The archive list refreshes automatically; you can also refresh it manually.',
+      ),
     ).toBeVisible({ timeout: 90_000 });
     await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled();
-    await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
-    await expect(page.getByText(/Downloads remain through Kubernetes/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Refresh archives' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Modified', exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: '22 B', exact: true })).toBeVisible();
+    const downloadUrl = await page.getByRole('link', { name: 'Download', exact: true }).getAttribute('href');
+    expect(downloadUrl).toMatch(/\/support-assist\/archives\/TSR[0-9]{14}_[A-Za-z0-9]+\.zip$/);
+    // MSW skips native download navigation; verify its response via fetch instead.
+    // The BFF tests exercise the real HTTP attachment and streamed cancellation.
+    const archive = await page.evaluate(async (url) => {
+      const response = await fetch(url!);
+      return {
+        status: response.status,
+        disposition: response.headers.get('content-disposition'),
+        type: response.headers.get('content-type'),
+        body: Array.from(new Uint8Array(await response.arrayBuffer())),
+      };
+    }, downloadUrl);
+    expect(archive.status).toBe(200);
+    expect(archive.type).toBe('application/zip');
+    expect(archive.disposition).toMatch(/^attachment; filename="TSR[0-9]{14}_[A-Za-z0-9]+\.zip"$/);
+    expect(archive.body).toEqual([80, 75, 5, 6, ...Array(18).fill(0)]);
+  });
+
+  test('shows unconfigured archives as information while collection remains available', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    const uuid = await idracNodeUuid(page);
+    await page.evaluate(() => {
+      const original = window.fetch;
+      window.fetch = (input, init) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith('/support-assist/archives')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: {
+                  code: 'unsupported',
+                  message: 'Archive downloads are not configured for this region.',
+                },
+              }),
+              { status: 406, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return original(input, init);
+      };
+    });
+    await openNodeMatching(page, uuid);
+    await page.getByRole('link', { name: 'SupportAssist', exact: true }).click();
+    await expect(page.getByText('Archive downloads are not configured for this region.')).toBeVisible();
+    await expect(page.getByText('Could not list archives')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Refresh archives' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Collect bundle' })).toBeEnabled();
   });
 
   test('shows unaccepted EULA and refreshes status without accepting it', async ({ page }) => {

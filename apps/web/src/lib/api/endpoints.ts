@@ -35,6 +35,7 @@ import {
   ScopeOptionsSchema,
   SessionSchema,
   SupportAssistEulaSchema,
+  SupportAssistArchivesSchema,
   SupportAssistTaskSchema,
   SupportAssistJobSchema,
   VendorPassthruMethodsSchema,
@@ -189,6 +190,14 @@ export const api = {
 
   vendorPassthruMethods: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/vendor-passthru/methods`, { schema: VendorPassthruMethodsSchema }),
+
+  supportAssistArchives: (region: string, uuid: string) =>
+    request(`/nodes/${enc(region)}/${enc(uuid)}/support-assist/archives`, {
+      schema: SupportAssistArchivesSchema,
+    }),
+
+  supportAssistDownloadUrl: (region: string, uuid: string, name: string) =>
+    `/api/nodes/${enc(region)}/${enc(uuid)}/support-assist/archives/${enc(name)}`,
 
   supportAssistEula: (region: string, uuid: string) =>
     request(`/nodes/${enc(region)}/${uuid}/support-assist/eula`, { schema: SupportAssistEulaSchema }),

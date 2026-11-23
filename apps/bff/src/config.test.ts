@@ -40,3 +40,30 @@ describe('EDITABLE_EXTRA_FIELDS', () => {
     ).toThrowError(/EDITABLE_EXTRA_FIELDS: "a\/b"/);
   });
 });
+
+describe('SUPPORT_ASSIST_ARCHIVES', () => {
+  it('requires HTTPS and refuses malformed secret configuration without printing credentials', () => {
+    for (const value of [
+      'secret-not-json',
+      JSON.stringify({
+        north1: { url: 'http://cdn.example.invalid/', username: 'reader', password: 'secret-password' },
+      }),
+      JSON.stringify({
+        north1: {
+          url: 'https://reader:secret-password@cdn.example.invalid/',
+          username: 'reader',
+          password: 'secret-password',
+        },
+      }),
+    ]) {
+      expect(() => loadConfig({ ...baseEnv, SUPPORT_ASSIST_ARCHIVES: value })).toThrow(
+        /SUPPORT_ASSIST_ARCHIVES: Expected/,
+      );
+      try {
+        loadConfig({ ...baseEnv, SUPPORT_ASSIST_ARCHIVES: value });
+      } catch (error) {
+        expect(String(error)).not.toContain('secret-password');
+      }
+    }
+  });
+});

@@ -255,6 +255,30 @@ export const handlers = [
     return respond(() => backend.supportAssistJob(String(params.uuid), payload.task_monitor), { read: true });
   }),
 
+  http.get('/api/nodes/:region/:uuid/support-assist/archives', ({ params }) =>
+    respond(() => backend.supportAssistArchives(String(params.uuid)), { read: true }),
+  ),
+  http.get('/api/nodes/:region/:uuid/support-assist/archives/:name', ({ params }) =>
+    respond(
+      () => {
+        const archive = backend
+          .supportAssistArchives(String(params.uuid))
+          .find((archive) => archive.name === params.name);
+        if (!archive) throw new MockApiError(404, 'not_found', 'Archive not found for this node.');
+        // An empty but valid ZIP; mock diagnostics contain no real hardware data.
+        const zip = new Uint8Array([80, 75, 5, 6, ...Array(18).fill(0)]);
+        return new HttpResponse(zip, {
+          headers: {
+            'Content-Type': 'application/zip',
+            'Content-Disposition': `attachment; filename="${archive.name}"`,
+            'Cache-Control': 'private, no-store',
+          },
+        });
+      },
+      { read: true },
+    ),
+  ),
+
   http.get('/api/nodes/:region/:uuid/console', ({ params }) =>
     respond(() => backend.getConsole(String(params.uuid)), { read: true }),
   ),

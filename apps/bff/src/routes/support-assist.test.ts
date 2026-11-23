@@ -14,18 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { createServer, type Server } from 'node:http';
+import { createServer, get, type Server, type RequestOptions, type IncomingMessage } from 'node:http';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SUPPORT_ASSIST_METHODS } from '@nodedash/shared';
-import { loadConfig } from '../config.ts';
+import { loadConfig, type Config } from '../config.ts';
 import { HttpError } from '../errors.ts';
 import { IronicClient } from '../ironic.ts';
 import type { KeystoneClient } from '../keystone.ts';
+import { audit } from '../audit.ts';
 import { registerSupportAssistRoutes } from './support-assist.ts';
 
+vi.mock('../audit.ts', () => ({ audit: vi.fn() }));
+
+// Exercise real HTTP streams locally without disabling production TLS verification.
+vi.mock('node:https', async () => {
+  const { request } = await import('node:http');
+  return {
+    request: (url: URL, options: RequestOptions, callback: (response: IncomingMessage) => void) => {
+      const local = new URL(url);
+      local.protocol = 'http:';
+      return request(local, options, callback);
+    },
+  };
+});
+
+const archive = 'TSR20260102120000_ABC1234.zip';
 const monitor = '/redfish/v1/Managers/iDRAC.Embedded.1/Oem/Dell/Jobs/JID_123';
 const base = '/api/nodes/north1/node-1';
 const methods = Object.fromEntries(
@@ -36,19 +52,83 @@ const methods = Object.fromEntries(
 );
 
 describe('SupportAssist routes with real Ironic HTTP transport', () => {
+  let config: Config;
   let upstream: Server;
   let app: FastifyInstance;
   let authenticated: boolean;
   let supported: boolean;
   let jobStatus: number;
+  let vendorStatus: number;
+  let storageStatus: number;
+  let serial: string | null;
+  let streaming: boolean;
+  let produced: number;
+  let storageClosed: Promise<void>;
+  let closeStorage: () => void;
+  let storageCalls: Array<{ path: string; auth?: string; token?: string }>;
+
   let calls: Array<{ path: string; method: string; body: string; token?: string; version?: string }>;
 
   beforeEach(async () => {
+    vi.mocked(audit).mockClear();
     authenticated = true;
     supported = true;
     jobStatus = 200;
+    vendorStatus = 200;
+    storageStatus = 200;
+    serial = 'ABC1234';
+    streaming = false;
+    produced = 0;
+    storageClosed = new Promise((resolve) => {
+      closeStorage = resolve;
+    });
+    storageCalls = [];
     calls = [];
     upstream = createServer(async (req, res) => {
+      if (req.url?.startsWith('/supportassist-archives/')) {
+        storageCalls.push({
+          path: req.url,
+          auth: req.headers.authorization,
+          token: req.headers['x-auth-token'] as string,
+        });
+        res.statusCode = storageStatus;
+        if (storageStatus !== 200) return res.end('Storage error with sensitive details');
+        if (req.url === '/supportassist-archives/')
+          return res.end(
+            JSON.stringify([
+              { name: archive, type: 'file', mtime: 'Fri, 02 Jan 2026 12:00:00 GMT', size: 8 },
+              {
+                name: 'TSR20260101120000_ABC1234.zip',
+                type: 'file',
+                mtime: 'Thu, 01 Jan 2026 12:00:00 GMT',
+                size: 4,
+              },
+              {
+                name: 'TSR20260102120000_OTHER.zip',
+                type: 'file',
+                mtime: 'Fri, 02 Jan 2026 12:00:00 GMT',
+                size: 8,
+              },
+              { name: archive + '.tmp', type: 'file', mtime: 'Fri, 02 Jan 2026 12:00:00 GMT', size: 8 },
+              { name: 'nested', type: 'directory', mtime: 'Fri, 02 Jan 2026 12:00:00 GMT' },
+            ]),
+          );
+        if (streaming) {
+          const chunk = Buffer.alloc(64 * 1024);
+          const timer = setInterval(() => {
+            produced += chunk.length;
+            res.write(chunk);
+          }, 5);
+          res.once('close', () => {
+            clearInterval(timer);
+            closeStorage();
+          });
+          return;
+        }
+        res.setHeader('Content-Length', '8');
+        res.write(Buffer.from([0x50, 0x4b, 0, 1]));
+        return setImmediate(() => res.end(Buffer.from([2, 3, 4, 5])));
+      }
       let body = '';
       for await (const chunk of req) body += chunk;
       calls.push({
@@ -62,7 +142,15 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
       if (req.url === '/v1') {
         res.setHeader('X-OpenStack-Ironic-API-Maximum-Version', '1.114');
         res.end('{}');
-      } else if (req.url?.endsWith('/methods')) res.end(JSON.stringify(supported ? methods : {}));
+      } else if (req.url?.endsWith('/methods')) {
+        res.statusCode = vendorStatus;
+        res.end(
+          JSON.stringify(
+            vendorStatus === 200 ? (supported ? methods : {}) : { error_message: 'Vendor access denied' },
+          ),
+        );
+      } else if (req.url?.endsWith('/inventory'))
+        res.end(JSON.stringify({ inventory: { system_vendor: { serial_number: serial } } }));
       else if (req.url?.endsWith('/support_assist_get_eula_status'))
         res.end(JSON.stringify({ accepted: false }));
       else if (req.url?.endsWith('/support_assist_collect'))
@@ -93,7 +181,14 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     upstream.listen(0, '127.0.0.1');
     await once(upstream, 'listening');
     const endpoint = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
-    const config = loadConfig({
+    config = loadConfig({
+      SUPPORT_ASSIST_ARCHIVES: JSON.stringify({
+        north1: {
+          url: endpoint.replace('http:', 'https:') + '/supportassist-archives/',
+          username: 'reader',
+          password: 'test-password',
+        },
+      }),
       PUBLIC_URL: 'https://nodes.example.invalid',
       KEYSTONE_URL: 'https://keystone.example.invalid',
       SESSION_KEYS: Buffer.alloc(32, 1).toString('base64'),
@@ -121,7 +216,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
       if (error instanceof HttpError) return reply.code(error.status).send({ error: error.message });
       throw error;
     });
-    registerSupportAssistRoutes(app, {} as KeystoneClient, new IronicClient(config));
+    registerSupportAssistRoutes(app, {} as KeystoneClient, new IronicClient(config), config);
   });
 
   afterEach(async () => {
@@ -130,6 +225,109 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
       await new Promise<void>((resolve, reject) =>
         upstream.close((error) => (error ? reject(error) : resolve())),
       );
+  });
+
+  it('lists only the selected inventory serial, newest first, using storage credentials only', async () => {
+    const response = await app.inject(`${base}/support-assist/archives`);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([
+      { name: archive, modified: '2026-01-02T12:00:00.000Z', size: 8 },
+      { name: 'TSR20260101120000_ABC1234.zip', modified: '2026-01-01T12:00:00.000Z', size: 4 },
+    ]);
+    expect(calls.find((call) => call.path.endsWith('/methods'))?.token).toBe('user-scoped-token');
+    expect(storageCalls).toEqual([
+      {
+        path: '/supportassist-archives/',
+        auth: `Basic ${Buffer.from('reader:test-password').toString('base64')}`,
+        token: undefined,
+      },
+    ]);
+    expect(response.body).not.toContain('test-password');
+  });
+
+  it('streams the selected archive as an attachment without changing its bytes', async () => {
+    const response = await app.inject(`${base}/support-assist/archives/${archive}`);
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toBe('application/zip');
+    expect(response.headers['content-disposition']).toBe(`attachment; filename="${archive}"`);
+    expect(response.headers['content-length']).toBe('8');
+    expect(response.rawPayload).toEqual(Buffer.from([0x50, 0x4b, 0, 1, 2, 3, 4, 5]));
+    expect(vi.mocked(audit).mock.calls.map(([, entry]) => entry.outcome)).toEqual(['requested', 'succeeded']);
+  });
+
+  it('delivers bytes before storage finishes and closes storage when the browser disconnects', async () => {
+    streaming = true;
+    const origin = await app.listen({ port: 0, host: '127.0.0.1' });
+    await new Promise<void>((resolve, reject) => {
+      get(`${origin}${base}/support-assist/archives/${archive}`, (response) => {
+        expect(response.statusCode).toBe(200);
+        response.once('data', () => {
+          response.destroy();
+          resolve();
+        });
+        response.on('error', reject);
+      }).on('error', reject);
+    });
+    await storageClosed;
+    expect(vi.mocked(audit).mock.calls.map(([, entry]) => entry.outcome)).toEqual(['requested', 'failed']);
+    expect(produced).toBeGreaterThan(0);
+    expect(produced).toBeLessThan(4 * 1024 * 1024);
+  });
+
+  it('checks vendor permissions for both listing and direct downloads on every request', async () => {
+    for (const status of [401, 403, 404]) {
+      vendorStatus = status;
+      for (const suffix of ['', `/${archive}`]) {
+        expect((await app.inject(`${base}/support-assist/archives${suffix}`)).statusCode).toBe(status);
+      }
+    }
+    expect(storageCalls).toEqual([]);
+    expect(calls.filter((call) => call.path.endsWith('/methods'))).toHaveLength(6);
+    vendorStatus = 200;
+    authenticated = false;
+    expect((await app.inject(`${base}/support-assist/archives/${archive}`)).statusCode).toBe(401);
+  });
+
+  it('refuses cross-node names, encoded paths, missing serials and unsupported drivers before storage access', async () => {
+    for (const name of [
+      'TSR20260102120000_OTHER.zip',
+      'TSR20260102120000_XABC1234.zip',
+      '%2e%2e%2fsecret',
+      archive + '%0d%0aX-Test:evil',
+      archive + '.tmp',
+    ]) {
+      expect((await app.inject(`${base}/support-assist/archives/${name}`)).statusCode).toBe(404);
+    }
+    serial = null;
+    expect((await app.inject(`${base}/support-assist/archives`)).statusCode).toBe(406);
+    supported = false;
+    expect((await app.inject(`${base}/support-assist/archives/${archive}`)).statusCode).toBe(406);
+    expect((await app.inject(`/api/nodes/unknown/node-1/support-assist/archives`)).statusCode).toBe(404);
+    expect(storageCalls).toEqual([]);
+  });
+
+  it('reports unconfigured archive access without contacting storage', async () => {
+    config.supportAssistArchives = {};
+    const response = await app.inject(`${base}/support-assist/archives`);
+    expect(response.statusCode).toBe(406);
+    expect(response.json()).toEqual({ error: 'Archive downloads are not configured for this region.' });
+    expect(storageCalls).toEqual([]);
+  });
+
+  it('sanitizes storage errors and preserves a missing archive as 404', async () => {
+    for (const status of [401, 403, 302, 500, 404]) {
+      storageStatus = status;
+      const response = await app.inject(`${base}/support-assist/archives/${archive}`);
+      expect(response.statusCode).toBe(status === 404 ? 404 : 502);
+      expect(response.body).not.toContain('sensitive');
+      expect(response.headers['content-disposition']).toBeUndefined();
+      expect(
+        vi
+          .mocked(audit)
+          .mock.calls.slice(-2)
+          .map(([, entry]) => entry.outcome),
+      ).toEqual(['requested', 'failed']);
+    }
   });
 
   it('reads EULA without accepting it and starts with Ironic defaults at the method path', async () => {
@@ -191,6 +389,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
   it('requires a session and discovers the required verbs before starting', async () => {
     authenticated = false;
     expect((await app.inject(`${base}/support-assist/eula`)).statusCode).toBe(401);
+    vi.mocked(audit).mockClear();
     authenticated = true;
     supported = false;
     expect((await app.inject({ method: 'POST', url: `${base}/support-assist` })).statusCode).toBe(406);

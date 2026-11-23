@@ -67,9 +67,12 @@ body to Ironic using Node’s HTTP client, because fetch forbids GET bodies. Aut
 does not determine completion. The monitor remains in the page URL for bookmarking and reloads; an
 operator can paste a monitor to resume polling. The BFF stores no jobs.
 
-Collection history and browser downloads are out of scope. Operators still verify and retrieve the ZIP
-through Kubernetes from the CDN SupportAssist volume. A completed job does not independently verify the
-uploaded archive, and this UI introduces no retention or deletion policy.
+Archive listing and browser downloads use a protected CDN read path, not a new Ironic endpoint. Both
+operations check Ironic’s vendor passthru policy on every request and use the inventory serial number to
+restrict filenames to the selected node. See [archive setup](support-assist-downloads.md).
+
+Archives are independent of job history: Ironic does not return the uploaded filename. A completed job
+does not independently verify the uploaded archive, and this UI introduces no retention or deletion policy.
 
 To check the UI in mock mode, sign in, select a project, open an `idrac` node and its SupportAssist tab.
 Check EULA status, choose **Collect bundle**, confirm the hardware collection, and watch it finish. Copy

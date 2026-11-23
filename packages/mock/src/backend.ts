@@ -24,6 +24,7 @@ import {
   supportsSupportAssist,
   toNodeRow,
   type ApiErrorCode,
+  type SupportAssistArchive,
   type CapabilitiesResponse,
   type IronicNode,
   type LocateResult,
@@ -150,6 +151,7 @@ export interface MockBackend {
     serviceId: string,
     query: { limit?: number; marker?: string; severity?: string },
   ): { entries: LogEntry[]; next: string | null };
+  supportAssistArchives(uuid: string): SupportAssistArchive[];
   supportAssistEula(uuid: string): { accepted: boolean };
   startSupportAssist(uuid: string): { task_monitor: string };
   supportAssistJob(uuid: string, taskMonitor: string): SupportAssistJob;
@@ -693,6 +695,21 @@ export function createMockBackend(options: MockBackendOptions): MockBackend {
         entries: page,
         next: start + limit < filtered.length ? (page[page.length - 1]?.id ?? null) : null,
       };
+    },
+
+    supportAssistArchives(uuid: string) {
+      const node = nodeInScope(uuid);
+      if (!supportsSupportAssist(vendorPassthruMethodsFor(node.driver))) {
+        throw new MockApiError(406, 'unsupported', 'Driver does not offer SupportAssist.');
+      }
+      const job = supportAssistJobs.get(uuid);
+      if (!job || job.completeAt > now()) return [];
+      const modified = new Date(job.completeAt).toISOString();
+      const serial = fixtures.inventory.get(uuid)?.inventory.system_vendor?.serial_number;
+      if (!serial) throw new MockApiError(406, 'unsupported', 'No inventory serial number.');
+      return [
+        { name: `TSR${modified.replace(/[^0-9]/g, '').slice(0, 14)}_${serial}.zip`, modified, size: 22 },
+      ];
     },
 
     supportAssistEula(uuid: string) {

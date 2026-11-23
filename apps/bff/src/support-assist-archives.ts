@@ -1,0 +1,87 @@
+/*
+Copyright 2026 Rackspace Technology.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { request as httpsRequest } from 'node:https';
+import type { IncomingMessage } from 'node:http';
+import { z } from 'zod';
+import { isSupportAssistArchiveFor, type SupportAssistArchive } from '@nodedash/shared';
+import type { Config } from './config.ts';
+import { HttpError } from './errors.ts';
+
+type ArchiveStore = Config['supportAssistArchives'][string];
+const unavailable = () =>
+  new HttpError(502, 'upstream_error', 'SupportAssist archive storage is unavailable.');
+
+/** No redirects or browser-provided URLs; storage credentials stay on this connection. */
+export function archiveResponse(store: ArchiveStore, name = ''): Promise<IncomingMessage> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(encodeURIComponent(name), store.url.replace(/\/?$/, '/'));
+    const request = httpsRequest(
+      url,
+      {
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${store.username}:${store.password}`).toString('base64')}`,
+        },
+        timeout: 300_000,
+      },
+      (response) => {
+        if (response.statusCode !== 200) {
+          response.destroy();
+          reject(
+            response.statusCode === 404
+              ? new HttpError(404, 'not_found', 'Archive not found.')
+              : unavailable(),
+          );
+        } else resolve(response);
+      },
+    );
+    request.on('timeout', () => request.destroy(new Error('Archive storage timed out.')));
+    request.on('error', () => reject(unavailable()));
+    request.end();
+  });
+}
+
+// NGINX autoindex JSON includes directories and file modification times in HTTP date format.
+const IndexSchema = z.array(
+  z.object({
+    name: z.string(),
+    type: z.string(),
+    mtime: z.string(),
+    size: z.number().int().nonnegative().optional(),
+  }),
+);
+
+export async function listArchives(store: ArchiveStore, serial: string): Promise<SupportAssistArchive[]> {
+  const response = await archiveResponse(store);
+  try {
+    const chunks: Buffer[] = [];
+    for await (const chunk of response) chunks.push(Buffer.from(chunk));
+    const entries = IndexSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    return entries
+      .flatMap((entry) => {
+        const modified = new Date(entry.mtime);
+        return entry.type === 'file' &&
+          entry.size !== undefined &&
+          !Number.isNaN(modified.getTime()) &&
+          isSupportAssistArchiveFor(entry.name, serial)
+          ? [{ name: entry.name, size: entry.size, modified: modified.toISOString() }]
+          : [];
+      })
+      .sort((a, b) => b.modified.localeCompare(a.modified) || b.name.localeCompare(a.name));
+  } catch {
+    throw unavailable();
+  }
+}

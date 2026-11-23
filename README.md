@@ -256,8 +256,10 @@ Node logs, health and sensors, and Redfish LogService passthrough still depend o
 
 SupportAssist uses the downstream Ironic `idrac` vendor methods for EULA status, collection start and job
 polling. The tab appears when the node advertises the required methods and HTTP verbs. EULA acceptance
-remains an explicit operator action outside NodeDash; downloads stay through Kubernetes. Bookmark the
-job URL or paste the task monitor to resume polling. See the API gaps document for the wire contract.
+remains an explicit operator action outside NodeDash. Bookmark the job URL or paste the task monitor to
+resume polling. Configured regions also list node archives with modification times and sizes, and stream
+authenticated downloads through the BFF using the same vendor passthru policy. See
+[archive setup](docs/support-assist-downloads.md) and the API gaps document for the wire contract.
 
 The mock compresses a SupportAssist collection from ~30 minutes to 45 seconds so it is walkable; the
 `support-assist-realtime` scenario restores the real pacing.
