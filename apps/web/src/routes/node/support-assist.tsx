@@ -60,7 +60,8 @@ export function NodeSupportAssistPage() {
       />
     );
 
-  // A polling error or an unrecognised handle must not look like a finished job.
+  // Start stays disabled while a job is unverified (poll error, unknown handle, still running),
+  // so a failed poll cannot look like a finished job.
   const canStart =
     eula.data?.accepted === true &&
     !eula.isError &&

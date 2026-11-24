@@ -62,6 +62,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
   let vendorStatus: number;
   let storageStatus: number;
   let streaming: boolean;
+  let oversizedIndex: boolean;
   let produced: number;
   let storageClosed: Promise<void>;
   let closeStorage: () => void;
@@ -77,6 +78,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     vendorStatus = 200;
     storageStatus = 200;
     streaming = false;
+    oversizedIndex = false;
     produced = 0;
     storageClosed = new Promise((resolve) => {
       closeStorage = resolve;
@@ -92,6 +94,7 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
         });
         res.statusCode = storageStatus;
         if (storageStatus !== 200) return res.end('Storage error with sensitive details');
+        if (oversizedIndex) return res.end(Buffer.alloc(5_000_001, 0x20));
         if (req.url === `/supportassist-archives/${uuid}/`)
           return res.end(
             JSON.stringify([
@@ -358,6 +361,11 @@ describe('SupportAssist routes with real Ironic HTTP transport', () => {
     expect(storageCalls.map((call) => call.path)).toEqual([`/supportassist-archives/${uuid}/`]);
   });
 
+  it('rejects an oversized archive index as unavailable storage', async () => {
+    oversizedIndex = true;
+    const response = await app.inject(`${base}/support-assist/archives`);
+    expect(response.statusCode).toBe(502);
+  });
   it('sanitizes storage errors and preserves a missing archive as 404', async () => {
     for (const status of [401, 403, 302, 500, 404]) {
       storageStatus = status;

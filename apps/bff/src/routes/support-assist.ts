@@ -25,7 +25,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.ts';
 import type { Config } from '../config.ts';
-import { archiveResponse, listArchives } from '../support-assist-archives.ts';
+import { archiveFile, listArchives } from '../support-assist-archives.ts';
 import { badRequest, unsupported, HttpError } from '../errors.ts';
 import type { IronicClient, IronicTarget } from '../ironic.ts';
 import type { KeystoneClient } from '../keystone.ts';
@@ -86,7 +86,7 @@ export function registerSupportAssistRoutes(
     const { uuid } = request.params;
     if (!z.uuid().safeParse(uuid).success) throw badRequest('A node UUID is required for archive access.');
     const target = await ironicTarget(keystone, request);
-    // Ironic checks baremetal:node:vendor_passthru here, on every request.
+    // This call is the authorization check: Ironic enforces baremetal:node:vendor_passthru on every request.
     if (!supportsSupportAssist(await methodsFor(target, request.params.uuid))) {
       throw unsupported('This node’s driver does not offer the required SupportAssist methods.');
     }
@@ -126,7 +126,7 @@ export function registerSupportAssistRoutes(
       };
       let response;
       try {
-        response = await archiveResponse(store, uuid, name);
+        response = await archiveFile(store, uuid, name);
       } catch (error) {
         finish('failed');
         throw error;

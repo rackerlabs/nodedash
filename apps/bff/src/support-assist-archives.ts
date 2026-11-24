@@ -31,19 +31,16 @@ const unavailable = () =>
   new HttpError(502, 'upstream_error', 'SupportAssist archive storage is unavailable.');
 
 /** No redirects or browser-provided URLs; storage credentials stay on this connection. */
-export function archiveResponse(store: ArchiveStore, uuid: string, name = ''): Promise<IncomingMessage> {
+function fetchStore(store: ArchiveStore, path: string, timeout: number): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
-    const url = new URL(
-      `${encodeURIComponent(uuid)}/${encodeURIComponent(name)}`,
-      store.url.replace(/\/?$/, '/'),
-    );
+    const url = new URL(path, store.url.replace(/\/?$/, '/'));
     const request = httpsRequest(
       url,
       {
         headers: {
           Authorization: `Basic ${Buffer.from(`${store.username}:${store.password}`).toString('base64')}`,
         },
-        timeout: name ? DOWNLOAD_TIMEOUT_MS : LIST_TIMEOUT_MS,
+        timeout,
       },
       (response) => {
         if (response.statusCode !== 200) {
@@ -62,6 +59,9 @@ export function archiveResponse(store: ArchiveStore, uuid: string, name = ''): P
   });
 }
 
+export const archiveFile = (store: ArchiveStore, uuid: string, name: string) =>
+  fetchStore(store, `${encodeURIComponent(uuid)}/${encodeURIComponent(name)}`, DOWNLOAD_TIMEOUT_MS);
+
 // NGINX autoindex JSON includes directories and file modification times in HTTP date format.
 const IndexSchema = z.array(
   z.object({
@@ -74,7 +74,7 @@ const IndexSchema = z.array(
 
 export async function listArchives(store: ArchiveStore, uuid: string): Promise<SupportAssistArchive[]> {
   try {
-    const response = await archiveResponse(store, uuid);
+    const response = await fetchStore(store, `${encodeURIComponent(uuid)}/`, LIST_TIMEOUT_MS);
     const chunks: Buffer[] = [];
     let bytes = 0;
     for await (const chunk of response) {
