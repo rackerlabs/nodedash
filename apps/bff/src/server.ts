@@ -174,5 +174,19 @@ if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {
     },
     'starting nodedash BFF',
   );
+  // Node runs as PID 1 in the image, and the kernel ignores signals PID 1 has no
+  // handler for, so without this the kubelet waits out the grace period and kills it.
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => {
+      app.log.info({ signal }, 'shutting down');
+      app.close().then(
+        () => process.exit(0),
+        (err: unknown) => {
+          app.log.error({ err }, 'shutdown failed');
+          process.exit(1);
+        },
+      );
+    });
+  }
   await app.listen({ host: config.host, port: config.port });
 }
