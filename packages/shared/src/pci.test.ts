@@ -67,6 +67,21 @@ describe('parsePciIds / lookupPci', () => {
     });
   });
 
+  it('reads unprefixed ids and a product id reported only as device_id', () => {
+    expect(
+      lookupPci(ids, {
+        vendor_id: '1234',
+        device_id: '0001',
+        subsystem_vendor_id: '1234',
+        subsystem_id: '0010',
+      }),
+    ).toEqual({
+      vendor: 'Example Vendor, Inc.',
+      device: 'Example NIC 25GbE',
+      subsystem: 'Example NIC 25GbE OCP card',
+    });
+  });
+
   it('falls back field by field when an id is unknown', () => {
     expect(lookupPci(ids, { vendor_id: '0x1234', product_id: '0xffff' })).toEqual({
       vendor: 'Example Vendor, Inc.',
@@ -100,8 +115,16 @@ describe('pciClassLabel / isPciBridge', () => {
     expect(pciClassLabel(null)).toBeNull();
   });
 
+  it('reads the Redfish DeviceClass value as words too', () => {
+    expect(pciClassLabel('NetworkController')).toBe('Network controller');
+    expect(pciClassLabel('MassStorageController')).toBe('Mass storage controller');
+    expect(pciClassLabel('Bridge')).toBe('Bridge');
+  });
+
   it('recognises bridges and nothing else', () => {
     expect(isPciBridge({ class: 'DeviceClass.BRIDGE' })).toBe(true);
+    expect(isPciBridge({ class: 'Bridge' })).toBe(true);
+    expect(isPciBridge({ class: 'NetworkController' })).toBe(false);
     expect(isPciBridge({ class: 'DeviceClass.NETWORK_CONTROLLER' })).toBe(false);
     expect(isPciBridge({})).toBe(false);
   });
