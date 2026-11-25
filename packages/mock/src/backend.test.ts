@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { describe, expect, it } from 'vitest';
+import { isPciBridge, NodeInventorySchema, pciClassLabel } from '@nodedash/shared';
 import { createMockBackend, MockApiError } from './backend.ts';
 import { findScenario } from './scenarios.ts';
 
@@ -327,6 +328,60 @@ describe('mock fixtures', () => {
       const firmware = backend.fixtures.firmware.get(node.uuid);
       if (firmware) expect(firmware[0]!.vendor).toBe(vendor);
     }
+  });
+});
+
+describe('mock fixtures: inspection data', () => {
+  it('stamps inspection_finished_at on inspected nodes only, as Ironic does', () => {
+    const { backend } = setup();
+    const { nodes, inventory } = backend.fixtures;
+    expect(nodes.some((node) => !inventory.has(node.uuid))).toBe(true);
+    for (const node of nodes) {
+      if (inventory.has(node.uuid)) {
+        expect(Number.isNaN(Date.parse(node.inspection_finished_at!))).toBe(false);
+        // Ironic keeps the timestamp on the node; it is not part of the stored inventory.
+        expect(inventory.get(node.uuid)!.plugin_data).not.toHaveProperty('inspection_finished_at');
+      } else {
+        expect(node.inspection_finished_at).toBeNull();
+      }
+    }
+  });
+
+  it('serves both the older and the current Redfish inventory shapes', () => {
+    const { backend, nodes } = setup();
+    const inspected = nodes.filter((node) => backend.fixtures.inventory.has(node.uuid));
+    const served = inspected.map((node) => NodeInventorySchema.parse(backend.getInventory(node.uuid)));
+    const current = served.filter((data) => data.inventory.cpu?.socket_count != null);
+    const older = served.filter((data) => data.inventory.cpu?.socket_count == null);
+    expect(current.length).toBeGreaterThan(0);
+    expect(older.length).toBeGreaterThan(0);
+
+    for (const data of current) {
+      const cpu = data.inventory.cpu!;
+      expect(cpu.thread_count).toBe(cpu.count);
+      expect(cpu.core_count! * 2).toBe(cpu.thread_count);
+      for (const device of data.inventory.pci_devices!) {
+        expect(device.class).toMatch(/^[A-Z][A-Za-z]+$/);
+        expect(device.vendor_id).toMatch(/^[0-9a-f]{4}$/);
+        expect(device.device_id).toBe(device.product_id);
+      }
+    }
+    for (const data of older) {
+      expect(data.inventory.cpu).not.toHaveProperty('core_count');
+      for (const device of data.inventory.pci_devices!) {
+        expect(device.class).toMatch(/^DeviceClass\.[A-Z_]+$/);
+        expect(device.vendor_id).toMatch(/^0x[0-9a-f]{4}$/);
+        expect(device).not.toHaveProperty('device_id');
+      }
+    }
+
+    // Whichever shape it arrives in, the same device reads the same way.
+    const labels = (data: (typeof served)[number]) =>
+      new Set(data.inventory.pci_devices!.map((device) => pciClassLabel(device.class)));
+    expect(labels(current[0]!)).toContain('Network controller');
+    expect(labels(older[0]!)).toContain('Network controller');
+    expect(current[0]!.inventory.pci_devices!.some(isPciBridge)).toBe(true);
+    expect(older[0]!.inventory.pci_devices!.some(isPciBridge)).toBe(true);
   });
 });
 

@@ -361,6 +361,69 @@ test.describe('node detail', () => {
     }
   });
 
+  /**
+   * A node in the scoped project: inspected with the current Redfish inventory shape,
+   * inspected with the older one, or never inspected at all.
+   */
+  async function nodeWithInventory(page: Page, kind: 'current' | 'older' | 'none'): Promise<string> {
+    return page.evaluate((wanted) => {
+      const backend = window.__mockBackend!;
+      const scope = backend.getSession().scope!.projectId;
+      const node = backend.fixtures.nodes.find((candidate) => {
+        if (candidate.owner !== scope) return false;
+        const stored = backend.fixtures.inventory.get(candidate.uuid);
+        if (!stored) return wanted === 'none';
+        if (wanted === 'none') return false;
+        return (stored.inventory.cpu?.socket_count != null) === (wanted === 'current');
+      });
+      if (!node) throw new Error(`no ${wanted} inventory node in the scoped project`);
+      return node.uuid;
+    }, kind);
+  }
+
+  for (const kind of ['current', 'older'] as const) {
+    test(`reads the ${kind} inventory shape and says when it was collected`, async ({ page }) => {
+      await signIn(page);
+      await chooseProject(page);
+      await page.goto(`/nodes/lab-1/${await nodeWithInventory(page, kind)}/inventory`);
+
+      await expect(page.getByText(/^Collected by the inspection that finished \d+[smhd] ago$/)).toBeVisible();
+
+      const cpu = page.getByText('CPU', { exact: true }).locator('xpath=ancestor::div[.//dl][1]');
+      for (const label of ['Sockets', 'Cores', 'Threads']) {
+        await expect(cpu.getByText(label, { exact: true })).toHaveCount(kind === 'current' ? 1 : 0);
+      }
+      await expect(cpu.getByText('Logical cores', { exact: true })).toHaveCount(kind === 'current' ? 0 : 1);
+
+      // Class, names and ids read the same whichever form Ironic stored them in.
+      const table = page.getByRole('table', { name: 'PCI devices' });
+      await expect(table.getByText('Network controller').first()).toBeVisible();
+      await expect(table.getByText('Mass storage controller').first()).toBeVisible();
+      await expect(table.getByText('MT2892 Family [ConnectX-6 Dx]').first()).toBeVisible();
+      await expect(
+        table.getByText('BCM57414 NetXtreme-E 10Gb/25Gb RDMA Ethernet Controller').first(),
+      ).toBeVisible();
+      await expect(table.getByText('15b3:101d').first()).toBeVisible();
+      // The first column is the class: every one of them in words, none in a raw enum form.
+      const classes = await table
+        .getByRole('row')
+        .locator('[role="cell"][aria-colindex="1"]')
+        .allInnerTexts();
+      expect(classes.length).toBeGreaterThan(0);
+      for (const label of classes) expect(label).toMatch(/^[A-Z][a-z]*( [a-z]+)*$/);
+      await expect(page.getByText(/\d+ bridges hidden/)).toBeVisible();
+    });
+  }
+
+  test('a node never inspected says so, with no collection time', async ({ page }) => {
+    await signIn(page);
+    await chooseProject(page);
+    await page.goto(`/nodes/lab-1/${await nodeWithInventory(page, 'none')}/inventory`);
+
+    await expect(page.getByText('No inventory stored for this node')).toBeVisible();
+    await expect(page.getByText(/Collected by the inspection/)).toHaveCount(0);
+  });
+
   test('sets and clears maintenance mode with a reason', async ({ page }) => {
     await signIn(page);
     await chooseProject(page);

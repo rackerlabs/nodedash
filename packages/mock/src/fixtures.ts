@@ -474,13 +474,20 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
               asset_tag: `AT-${uuid.slice(0, 8).toUpperCase()}`,
               source_of_truth: { system: 'dcim', device_id: uuid },
             },
+      // Filled in below once it is known whether the node has been inspected.
+      inspection_started_at: null,
+      inspection_finished_at: null,
       created_at: isoDaysAgo(rng, 720),
       updated_at: isoDaysAgo(rng, 14),
     });
 
     // Not every node has been inspected, so inventory is legitimately missing
     // for some of them and the UI has to say so.
-    if (rng.bool(0.85)) inventory.set(uuid, buildInventory(rng, uuid, hardware));
+    if (rng.bool(0.85)) {
+      const inspected = buildInventory(rng, uuid, hardware);
+      inventory.set(uuid, inspected.data);
+      nodes[nodes.length - 1]!.inspection_finished_at = inspected.finishedAt;
+    }
     if (rng.bool(0.9)) bios.set(uuid, buildBiosSettings(rng));
     if (rng.bool(0.8)) firmware.set(uuid, buildFirmware(rng, hardware));
 
@@ -521,6 +528,8 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
         description: `Child of ${parent.name}`,
         properties: { cpus: 8, memory_mb: 16384, local_gb: 64, cpu_arch: 'aarch64' },
         extra: {},
+        inspection_started_at: null,
+        inspection_finished_at: null,
         created_at: parent.created_at,
         updated_at: parent.updated_at,
       });
@@ -540,7 +549,7 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
     supportAssist,
     pciDevices(uuid: string) {
       if (!nodesByUuid.has(uuid)) return [];
-      return buildPciDevices(createRng(options.seed + hashUuid(uuid) + 2));
+      return buildPciDevices(createRng(options.seed + hashUuid(uuid) + 2), redfishInspected(uuid));
     },
     ports(uuid: string) {
       const node = nodesByUuid.get(uuid);
@@ -724,16 +733,19 @@ function buildInventory(
   rng: Rng,
   uuid: string,
   hardware: { manufacturer: string; product: string },
-): NodeInventory {
+): { data: NodeInventory; finishedAt: string } {
   const diskCount = 2 + rng.int(6);
   const nicCount = 2 + rng.int(3);
   const vendor = hardware.manufacturer;
-  return {
+  const count = rng.pick([32, 48, 64]);
+  const data: NodeInventory = {
     inventory: {
       hostname: `bmc-${uuid.slice(0, 8)}`,
       memory: { total: rng.pick([137438953472, 274877906944]), physical_mb: rng.pick([131072, 262144]) },
       cpu: {
-        count: rng.pick([32, 48, 64]),
+        count,
+        // Two sockets with SMT, from the count already drawn so no later fixture shifts.
+        ...(redfishInspected(uuid) ? { socket_count: 2, core_count: count / 2, thread_count: count } : {}),
         model_name: rng.pick(CPU_MODELS),
         architecture: 'x86_64',
         frequency: rng.pick(['2000.000', '2400.000', '2850.000']),
@@ -769,9 +781,19 @@ function buildInventory(
     },
     plugin_data: {
       inspection_collectors: 'default,logs,pci-devices',
-      inspection_finished_at: isoDaysAgo(rng, 90),
     },
   };
+  // Ironic records when inspection finished on the node, not in the inventory.
+  return { data, finishedAt: isoDaysAgo(rng, 90) };
+}
+
+/**
+ * Whether a node's stored inventory is in the shape current Redfish inspection writes
+ * (CPU topology, Redfish class names, unprefixed ids) or the older one. A fleet has both
+ * until every node is inspected again. Read from the uuid so it costs no random draws.
+ */
+function redfishInspected(uuid: string): boolean {
+  return Number.parseInt(uuid.charAt(0), 16) % 2 === 0;
 }
 
 function buildBiosSettings(rng: Rng): BiosSetting[] {
@@ -981,23 +1003,27 @@ export function withPortLldp(data: NodeInventory, ports: IronicPort[]): NodeInve
 }
 
 /**
- * Public ids that pci.ids knows, in the shape Ironic reports them (0x-prefixed hex,
- * class as a Python enum name, no bus address). Every node gets plenty of bridges,
- * which the UI hides, plus one device whose ids no database knows.
+ * Public ids that pci.ids knows, in the shape Ironic reports them, no bus address. Older
+ * inventories have 0x-prefixed hex and the class as a Python enum name
+ * (`DeviceClass.NETWORK_CONTROLLER`); current Redfish inspection writes bare hex, the
+ * Redfish class (`NetworkController`) and the product id again as `device_id`. Every node
+ * gets plenty of bridges, which the UI hides, plus one device whose ids no database knows.
  */
-function buildPciDevices(rng: Rng): PciDevice[] {
+function buildPciDevices(rng: Rng, redfish: boolean): PciDevice[] {
+  const hex = (id: string) => (redfish ? id.replace(/^0x/, '') : id);
   const device = (
     deviceClass: string,
     vendor: string,
     product: string,
     subsystem: [string, string] = ['0x0000', '0x0000'],
   ): PciDevice => ({
-    class: `DeviceClass.${deviceClass}`,
-    vendor_id: vendor,
-    product_id: product,
-    subsystem_vendor_id: subsystem[0],
-    subsystem_id: subsystem[1],
-    revision: `0x${rng.hex(2)}`,
+    class: redfish ? redfishClass(deviceClass) : `DeviceClass.${deviceClass}`,
+    vendor_id: hex(vendor),
+    product_id: hex(product),
+    ...(redfish ? { device_id: hex(product) } : {}),
+    subsystem_vendor_id: hex(subsystem[0]),
+    subsystem_id: hex(subsystem[1]),
+    revision: hex(`0x${rng.hex(2)}`),
   });
 
   const devices = [
@@ -1017,4 +1043,13 @@ function buildPciDevices(rng: Rng): PciDevice[] {
   // Not in any database: a reviewer sees the raw-id fallback.
   devices.push(device('SERIAL_BUS_CONTROLLER', '0xfeed', '0x0001'));
   return devices;
+}
+
+/** `NETWORK_CONTROLLER` as Redfish's DeviceClass value, `NetworkController`. */
+function redfishClass(name: string): string {
+  return name
+    .toLowerCase()
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
 }

@@ -66,6 +66,9 @@ export const NodeSchema = z.looseObject({
   driver_info: jsonRecord.nullish(),
   /** Free-form metadata operators and tooling attach to the node. */
   extra: jsonRecord.nullish(),
+  /** When the last inspection began and ended; the stored inventory is from that run. */
+  inspection_started_at: z.string().nullish(),
+  inspection_finished_at: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
 });
@@ -172,11 +175,16 @@ export const InventoryInterfaceSchema = z.looseObject({
   product: z.string().nullish(),
 });
 
-/** Ids arrive as `0x`-prefixed hex strings; `class` is a Python enum name. */
+/**
+ * Ids are hex strings, with or without a `0x` prefix depending on the ramdisk. `class`
+ * is a name: `NetworkController` from current ramdisks, `DeviceClass.NETWORK_CONTROLLER`
+ * from older ones. Current ramdisks also report the product id as `device_id`.
+ */
 export const PciDeviceSchema = z.looseObject({
   class: z.string().nullish(),
   vendor_id: z.string().nullish(),
   product_id: z.string().nullish(),
+  device_id: z.string().nullish(),
   subsystem_vendor_id: z.string().nullish(),
   subsystem_id: z.string().nullish(),
   revision: z.string().nullish(),
@@ -193,7 +201,12 @@ export const InventorySchema = z.looseObject({
     .nullish(),
   cpu: z
     .looseObject({
+      /** Logical CPUs, i.e. hardware threads across every socket. */
       count: z.number().nullish(),
+      /** Topology, reported by newer ramdisks only. */
+      socket_count: z.number().nullish(),
+      core_count: z.number().nullish(),
+      thread_count: z.number().nullish(),
       model_name: z.string().nullish(),
       architecture: z.string().nullish(),
       frequency: z.union([z.string(), z.number()]).nullish(),

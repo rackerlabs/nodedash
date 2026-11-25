@@ -102,10 +102,10 @@ export interface PciNames {
 
 export function lookupPci(
   ids: PciIds,
-  device: Pick<PciDevice, 'vendor_id' | 'product_id' | 'subsystem_vendor_id' | 'subsystem_id'>,
+  device: Pick<PciDevice, 'vendor_id' | 'product_id' | 'device_id' | 'subsystem_vendor_id' | 'subsystem_id'>,
 ): PciNames {
   const vendorId = normalizePciId(device.vendor_id);
-  const productId = normalizePciId(device.product_id);
+  const productId = pciProductId(device);
   const vendor = vendorId ? ids.get(vendorId) : undefined;
   const product = productId ? vendor?.devices.get(productId) : undefined;
 
@@ -117,14 +117,22 @@ export function lookupPci(
   return { vendor: vendor?.name ?? null, device: product?.name ?? null, subsystem: subsystem ?? null };
 }
 
-/** Ironic reports the class as a Python enum name, e.g. `DeviceClass.NETWORK_CONTROLLER`. */
+/** The product (device) id; newer inspections also report it as `device_id`. */
+export function pciProductId(device: Pick<PciDevice, 'product_id' | 'device_id'>): string | null {
+  return normalizePciId(device.product_id) ?? normalizePciId(device.device_id);
+}
+
+/**
+ * Redfish inspection reports the class as its `DeviceClass` value, e.g. `NetworkController`;
+ * older Ironic sent the Python enum's name instead, e.g. `DeviceClass.NETWORK_CONTROLLER`.
+ * Both read as `Network controller`.
+ */
 export function pciClassLabel(deviceClass: string | null | undefined): string | null {
   if (!deviceClass) return null;
-  const name = deviceClass
-    .replace(/^DeviceClass\./, '')
-    .replaceAll('_', ' ')
-    .toLowerCase();
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  const raw = deviceClass.replace(/^DeviceClass\./, '');
+  const words = raw.includes('_') ? raw.replaceAll('_', ' ') : raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  const name = words.trim().toLowerCase();
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : null;
 }
 
 /**

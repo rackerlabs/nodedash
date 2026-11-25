@@ -22,6 +22,7 @@ import {
   lookupPci,
   normalizePciId,
   pciClassLabel,
+  pciProductId,
   toPortRow,
   type PortLldp,
 } from '@nodedash/shared';
@@ -33,11 +34,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, Field, Skeleton } from '@/components/ui/misc';
+import { Hint } from '@/components/ui/tooltip';
 import { isNotFound } from '@/lib/api/client';
 import { usePciIds } from '@/features/node/use-pci-ids';
 import { api } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/keys';
-import { formatBytes } from '@/lib/format';
+import { formatBytes, formatTimestamp, relativeTime } from '@/lib/format';
+import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import { ErrorPanel } from '../status';
 import { useNodeContext } from './context';
@@ -92,6 +95,7 @@ export function NodeInventoryPage() {
     retry: false,
   });
   const pciIds = usePciIds();
+  const now = useNow(30_000);
   const pciDevices = query.data?.inventory.pci_devices;
   const { pciRows, bridgeCount } = useMemo(() => {
     const devices = pciDevices ?? [];
@@ -106,7 +110,7 @@ export function NodeInventoryPage() {
           className: pciClassLabel(device.class),
           ...names,
           vendorId: normalizePciId(device.vendor_id),
-          productId: normalizePciId(device.product_id),
+          productId: pciProductId(device),
           revision: device.revision ?? null,
         };
       });
@@ -157,6 +161,11 @@ export function NodeInventoryPage() {
     inventory.memory?.total ??
     (inventory.memory?.physical_mb ? inventory.memory.physical_mb * 1024 * 1024 : null);
   const totalGib = totalBytes === null ? null : totalBytes / 1024 ** 3;
+  const cpu = inventory.cpu;
+  // Only newer inspections report the topology; older inventories get just the logical count.
+  const hasTopology = cpu?.socket_count != null || cpu?.core_count != null || cpu?.thread_count != null;
+  // The inventory is whatever the last inspection stored, so say how old it is.
+  const inspectedAt = node.inspection_finished_at;
 
   const diskColumns: Array<DataColumn<Disk>> = [
     {
@@ -350,6 +359,13 @@ export function NodeInventoryPage() {
 
   return (
     <div className="space-y-4">
+      {inspectedAt ? (
+        <p className="text-xs text-muted-foreground">
+          <Hint label={formatTimestamp(inspectedAt)}>
+            <span>Collected by the inspection that finished {relativeTime(inspectedAt, now)}</span>
+          </Hint>
+        </p>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
@@ -359,16 +375,33 @@ export function NodeInventoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <dl>
-              <Field label="Model">{inventory.cpu?.model_name ?? '—'}</Field>
-              <Field label="Logical cores" mono>
-                {inventory.cpu?.count ?? '—'}
+            {/* Short figures share a row so the card is no taller than its neighbours. */}
+            <dl className="grid grid-cols-6 gap-x-4">
+              <Field label="Model" className="col-span-6">
+                {cpu?.model_name ?? '—'}
               </Field>
-              <Field label="Architecture" mono>
-                {inventory.cpu?.architecture ?? '—'}
+              {hasTopology ? (
+                <>
+                  <Field label="Sockets" mono className="col-span-2">
+                    {cpu?.socket_count ?? '—'}
+                  </Field>
+                  <Field label="Cores" mono className="col-span-2">
+                    {cpu?.core_count ?? '—'}
+                  </Field>
+                  <Field label="Threads" mono className="col-span-2">
+                    {cpu?.thread_count ?? cpu?.count ?? '—'}
+                  </Field>
+                </>
+              ) : (
+                <Field label="Logical cores" mono className="col-span-6">
+                  {cpu?.count ?? '—'}
+                </Field>
+              )}
+              <Field label="Architecture" mono className="col-span-3">
+                {cpu?.architecture ?? '—'}
               </Field>
-              <Field label="Frequency" mono>
-                {inventory.cpu?.frequency ? `${inventory.cpu.frequency} MHz` : '—'}
+              <Field label="Frequency" mono className="col-span-3">
+                {cpu?.frequency ? `${cpu.frequency} MHz` : '—'}
               </Field>
             </dl>
           </CardContent>
