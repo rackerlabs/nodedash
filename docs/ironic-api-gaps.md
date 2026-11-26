@@ -4,16 +4,13 @@ Endpoints this UI depends on that **do not exist in upstream Ironic today**. Eac
 the Ironic side — as a vendor passthru, a new REST resource, or an extension of an existing one — before
 the corresponding feature works against a real deployment.
 
-Until an item here is delivered, the feature is answered only by the mock backend
+The remaining mocked endpoints below are answered only by the mock backend
 (`packages/mock/src/backend.ts`) and the UI degrades to an explanatory empty state rather than an error.
 
 **Status key:** `mocked` = contract designed, mock implements it, Ironic side not started.
 
 | # | Endpoint | Purpose | Consumer | Status |
 | --- | --- | --- | --- | --- |
-| 1 | `POST /v1/nodes/{node}/vendor_passthru?method=collect_support_assist` | Start a Dell SupportAssist collection | SupportAssist tab | mocked |
-| 2 | `GET /v1/nodes/{node}/vendor_passthru?method=support_assist_collections` | List collections held for a node | SupportAssist tab | mocked |
-| 3 | `GET /v1/nodes/{node}/vendor_passthru?method=support_assist_collection_url` | Mint a short-lived download URL | SupportAssist download | mocked |
 | 4 | `GET /v1/nodes/{node}/logs` | List ramdisk/agent log archives the conductor collected | Logs tab | mocked |
 | 5 | `GET /v1/nodes/{node}/logs/{log_id}` | Fetch the content of one log archive | Logs tab | mocked |
 | 6 | `GET /v1/nodes/{node}/health` | Aggregated health: overall state plus BMC sensor readings | Health tab | mocked |
@@ -41,36 +38,46 @@ For contrast — these are real and need no Ironic work:
 
 ---
 
-## 1–3. SupportAssist collection
+## SupportAssist (downstream Ironic)
 
-See `packages/shared/src/support-assist.ts` for the full schema. Summary:
+SupportAssist uses the downstream `idrac` vendor interface, discovered per node through
+`vendor_passthru/methods`.
 
 ```text
-POST /v1/nodes/{node}/vendor_passthru?method=collect_support_assist
-  body: {"data_selectors": ["HWData", "Debug"], "filter_pii": true}
-  -> 202 Accepted, body is the created collection
+GET /v1/nodes/{node}/vendor_passthru/support_assist_get_eula_status
+  -> {"accepted": true, "details": ...}
 
-GET /v1/nodes/{node}/vendor_passthru?method=support_assist_collections
-  -> {"collections": [{id, state, percent, started_at, finished_at,
-                       estimated_completion_at, requested_by, data_selectors,
-                       filter_pii, filename, size_bytes, expires_at, error}]}
+POST /v1/nodes/{node}/vendor_passthru/support_assist_collect
+  body: {}
+  -> 200 {"task_monitor": "/redfish/v1/.../Jobs/JID_123"}
 
-GET /v1/nodes/{node}/vendor_passthru?method=support_assist_collection_url&collection_id={id}
-  -> {"url": "https://...", "expires_at": "..."}
+GET /v1/nodes/{node}/vendor_passthru/get_job_status
+  JSON body: {"task_monitor": "/redfish/v1/.../Jobs/JID_123"}
+  -> {task_monitor, is_processing, task_state, task_status,
+      percent_complete, messages, job_state}
 ```
 
-Notes for whoever implements this:
+NodeDash uses Ironic’s collection defaults (`HWData`, `filter_data: false`) and its configured upload
+share. It displays EULA status without accepting license terms. An authorised operator must accept
+Dell’s EULA separately if necessary, then refresh the status.
 
-- `state` is one of `queued`, `collecting`, `uploading`, `available`, `failed`, `expired`.
-- Belongs on the `idrac` hardware type. A Dell box on the generic `redfish` driver cannot do it, and the UI
-  relies on `vendor_passthru/methods` to say so.
-- `require_exclusive_lock: true` on the collect method; one collection at a time per node.
-- `expires_at` is not optional in practice. A bundle can contain customer data and must not sit in object
-  storage indefinitely; the conductor should delete it and flip the state to `expired`.
-- `filter_pii` maps to Dell's `Filter` option. Honour it — the UI defaults it on and treats turning it off
-  as a decision requiring acknowledgement.
-- The download URL should be short-lived and single-purpose. The BFF redirects the browser to it and never
-  caches the bytes.
+The browser sends `POST /api/nodes/{region}/{node}/support-assist/job`; the BFF sends a GET with a JSON
+body to Ironic using Node’s HTTP client, because fetch forbids GET bodies. Automatic polling runs every
+10 seconds while `is_processing` is true, stops on errors, and can be retried manually. Percentage alone
+does not determine completion. The monitor remains in the page URL for bookmarking and reloads; an
+operator can paste a monitor to resume polling. The BFF stores no jobs.
+
+Archive listing and browser downloads use a protected CDN read path. Both operations check Ironic’s
+vendor passthru policy on every request and access only the selected node's UUID directory.
+See [archive setup](support-assist-downloads.md).
+
+Archives are independent of job history: Ironic does not return the uploaded filename. A completed job
+does not independently verify the uploaded archive. Manage retention and deletion separately.
+
+To check the UI in mock mode, sign in, select a project, open an `idrac` node and its SupportAssist tab.
+Check EULA status, choose **Collect bundle**, confirm the hardware collection, and watch it finish. Copy
+the task monitor, leave the tab, return and paste it into **Resume a job**. The mock compresses collection
+to 45 seconds. A full page reload resets the mock BMC; a real iDRAC retains its jobs independently.
 
 ## 4–5. Node logs (ramdisk / agent)
 

@@ -25,7 +25,6 @@ import {
   type NodeInventory,
   type Project,
   type Runbook,
-  type SupportAssistCollection,
   type VendorPassthruMethods,
 } from '@nodedash/shared';
 import { buildDiagnostics, type Diagnostics } from './diagnostics.ts';
@@ -46,12 +45,8 @@ export interface Fixtures {
   inventory: Map<string, NodeInventory>;
   bios: Map<string, BiosSetting[]>;
   firmware: Map<string, FirmwareComponent[]>;
-  /**
-   * node uuid -> past SupportAssist collections, newest first. Only populated for
-   * nodes whose driver offers the passthru, and seeded with a finished and a failed
-   * collection so both outcomes are visible without waiting for one to run.
-   */
-  supportAssist: Map<string, SupportAssistCollection[]>;
+  /** EULA state is held by the BMC; exposed here for test setup. */
+  supportAssistEula: Map<string, boolean>;
   /**
    * Node history, ramdisk logs, BMC health and Redfish event logs. Built lazily:
    * generating them for 5,000 nodes up front costs seconds and a lot of memory for
@@ -83,28 +78,23 @@ export function vendorPassthruMethodsFor(driver: string | null | undefined): Ven
     },
     [SUPPORT_ASSIST_METHODS.collect]: {
       http_methods: ['POST'],
-      async: true,
-      description: 'Start a Dell SupportAssist collection and upload it to object storage.',
+      async: false,
+      description: 'Start a Dell SupportAssist collection and upload it to the configured share.',
       require_exclusive_lock: true,
     },
-    [SUPPORT_ASSIST_METHODS.list]: {
+    [SUPPORT_ASSIST_METHODS.eula]: {
       http_methods: ['GET'],
       async: false,
-      description: 'List SupportAssist collections held for this node.',
+      description: 'Read SupportAssist EULA acceptance.',
       require_exclusive_lock: false,
     },
-    [SUPPORT_ASSIST_METHODS.downloadUrl]: {
+    [SUPPORT_ASSIST_METHODS.job]: {
       http_methods: ['GET'],
       async: false,
-      description: 'Mint a short-lived download URL for one SupportAssist collection.',
+      description: 'Read a Redfish task or Dell job status.',
       require_exclusive_lock: false,
     },
   };
-}
-
-export function supportAssistFilename(node: Pick<IronicNode, 'name' | 'uuid'>, at: string): string {
-  const stamp = at.slice(0, 19).replace(/[:-]/g, '').replace('T', '-');
-  return `supportassist-${node.name ?? node.uuid}-${stamp}.tar.gz`;
 }
 
 /**
@@ -385,7 +375,7 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
   const inventory = new Map<string, NodeInventory>();
   const bios = new Map<string, BiosSetting[]>();
   const firmware = new Map<string, FirmwareComponent[]>();
-  const supportAssist = new Map<string, SupportAssistCollection[]>();
+  const supportAssistEula = new Map<string, boolean>();
   const diagnosticsCache = new Map<string, Diagnostics>();
 
   for (let index = 0; index < options.nodeCount; index += 1) {
@@ -492,9 +482,8 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
     if (rng.bool(0.8)) firmware.set(uuid, buildFirmware(rng, hardware));
 
     const node = nodes[nodes.length - 1]!;
-    if (node.driver === 'idrac' && rng.bool(0.6)) {
-      supportAssist.set(uuid, buildSupportAssistHistory(rng, node));
-    }
+    // Preserve the random sequence used by subsequent node fixtures.
+    if (node.driver === 'idrac') rng.next();
   }
 
   // Appended after the main loop and drawn from their own generator, so adding
@@ -546,7 +535,7 @@ export function buildFixtures(options: FixtureOptions): Fixtures {
     inventory,
     bios,
     firmware,
-    supportAssist,
+    supportAssistEula,
     pciDevices(uuid: string) {
       if (!nodesByUuid.has(uuid)) return [];
       return buildPciDevices(createRng(options.seed + hashUuid(uuid) + 2), redfishInspected(uuid));
@@ -851,76 +840,6 @@ function buildFirmware(rng: Rng, hardware: { manufacturer: string; product: stri
     created_at: isoDaysAgo(rng, 300),
     updated_at: isoDaysAgo(rng, 25),
   }));
-}
-
-/**
- * A plausible history for a node that has been through support cases before: a
- * finished bundle still inside its retention window, sometimes a failed attempt,
- * and sometimes one that has aged out of storage.
- */
-function buildSupportAssistHistory(rng: Rng, node: IronicNode): SupportAssistCollection[] {
-  const collections: SupportAssistCollection[] = [];
-
-  const finishedAt = isoDaysAgo(rng, 9);
-  const startedAt = new Date(new Date(finishedAt).getTime() - (26 + rng.int(9)) * 60_000).toISOString();
-  collections.push({
-    id: rng.uuid(),
-    state: 'available',
-    percent: 100,
-    started_at: startedAt,
-    finished_at: finishedAt,
-    estimated_completion_at: finishedAt,
-    requested_by: rng.pick(['example-user@example.com', 'dc-ops@example.com']),
-    data_selectors: ['HWData', 'Debug'],
-    filter_pii: true,
-    filename: supportAssistFilename(node, startedAt),
-    size_bytes: (28 + rng.int(140)) * 1024 * 1024,
-    // Bundles can hold customer data, so storage expires them rather than keeping
-    // them indefinitely.
-    expires_at: new Date(new Date(finishedAt).getTime() + 14 * 86_400_000).toISOString(),
-    error: null,
-  });
-
-  if (rng.bool(0.45)) {
-    const failedStart = isoDaysAgo(rng, 40);
-    collections.push({
-      id: rng.uuid(),
-      state: 'failed',
-      percent: null,
-      started_at: failedStart,
-      finished_at: new Date(new Date(failedStart).getTime() + 31 * 60_000).toISOString(),
-      estimated_completion_at: null,
-      requested_by: 'dc-ops@example.com',
-      data_selectors: ['HWData', 'Debug', 'OSAppData'],
-      filter_pii: false,
-      filename: null,
-      size_bytes: null,
-      expires_at: null,
-      error:
-        'iDRAC job JID_874219556301 failed: OS Collector could not reach the host agent (node was powered off).',
-    });
-  }
-
-  if (rng.bool(0.35)) {
-    const oldStart = isoDaysAgo(rng, 200);
-    collections.push({
-      id: rng.uuid(),
-      state: 'expired',
-      percent: 100,
-      started_at: oldStart,
-      finished_at: new Date(new Date(oldStart).getTime() + 29 * 60_000).toISOString(),
-      estimated_completion_at: null,
-      requested_by: 'dc-ops@example.com',
-      data_selectors: ['HWData'],
-      filter_pii: true,
-      filename: supportAssistFilename(node, oldStart),
-      size_bytes: (30 + rng.int(60)) * 1024 * 1024,
-      expires_at: new Date(new Date(oldStart).getTime() + 14 * 86_400_000).toISOString(),
-      error: null,
-    });
-  }
-
-  return collections;
 }
 
 /**

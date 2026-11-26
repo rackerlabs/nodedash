@@ -251,15 +251,15 @@ reporter.
 
 ## Ironic API gaps
 
-Several features here depend on Ironic endpoints that **do not exist upstream yet** — SupportAssist
-collection, node logs, health and sensors, and the Redfish LogService passthrough. They are specified,
-mocked and built in the UI ahead of the Ironic-side work.
+Node logs, health and sensors, and Redfish LogService passthrough still depend on proposed Ironic endpoints.
+**[docs/ironic-api-gaps.md](docs/ironic-api-gaps.md) lists these gaps.**
 
-**[docs/ironic-api-gaps.md](docs/ironic-api-gaps.md) is the authoritative list.** Keep it current: if you
-add a feature that assumes an endpoint we have not built, it goes in that table.
-
-Against a real deployment these endpoints 404 until the Ironic work lands, and the UI presents that as "not
-available on this deployment" rather than as an error.
+SupportAssist uses the downstream Ironic `idrac` vendor methods for EULA status, collection start and job
+polling. The tab appears when the node advertises the required methods and HTTP verbs. EULA acceptance
+remains an explicit operator action outside NodeDash. Bookmark the job URL or paste the task monitor to
+resume polling. Configured regions also list node archives with modification times and sizes, and stream
+authenticated downloads through the BFF using the same vendor passthru policy. See
+[archive setup](docs/support-assist-downloads.md) and the API gaps document for the wire contract.
 
 The mock compresses a SupportAssist collection from ~30 minutes to 45 seconds so it is walkable; the
 `support-assist-realtime` scenario restores the real pacing.

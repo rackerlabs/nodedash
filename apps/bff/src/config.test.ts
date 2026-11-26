@@ -40,3 +40,41 @@ describe('EDITABLE_EXTRA_FIELDS', () => {
     ).toThrowError(/EDITABLE_EXTRA_FIELDS: "a\/b"/);
   });
 });
+
+describe('SupportAssist archive storage', () => {
+  const archiveEnv = {
+    ...baseEnv,
+    SUPPORT_ASSIST_ARCHIVE_URL: 'https://cdn.{region}.example.invalid/supportassist-archives/',
+    SUPPORT_ASSIST_ARCHIVE_USERNAME: 'reader',
+    SUPPORT_ASSIST_ARCHIVE_PASSWORD: 'secret-password',
+  };
+  it('is off unless a URL is set', () => {
+    expect(loadConfig({ ...baseEnv } as NodeJS.ProcessEnv).supportAssistArchive).toBeNull();
+  });
+  it('keeps the {region} template and the shared credential', () => {
+    expect(loadConfig(archiveEnv as NodeJS.ProcessEnv).supportAssistArchive).toEqual({
+      url: 'https://cdn.{region}.example.invalid/supportassist-archives/',
+      username: 'reader',
+      password: 'secret-password',
+    });
+  });
+  it('refuses unsafe settings without printing credentials', () => {
+    for (const override of [
+      { SUPPORT_ASSIST_ARCHIVE_URL: 'http://cdn.{region}.example.invalid/' },
+      { SUPPORT_ASSIST_ARCHIVE_URL: 'https://cdn.example.invalid/' },
+      { SUPPORT_ASSIST_ARCHIVE_URL: 'https://reader:secret-password@cdn.{region}.example.invalid/' },
+      { SUPPORT_ASSIST_ARCHIVE_URL: 'https://cdn.{region}.example.invalid/?a=b' },
+      { SUPPORT_ASSIST_ARCHIVE_USERNAME: 'read:er' },
+      { SUPPORT_ASSIST_ARCHIVE_USERNAME: '' },
+      { SUPPORT_ASSIST_ARCHIVE_PASSWORD: '' },
+    ]) {
+      const env = { ...archiveEnv, ...override } as NodeJS.ProcessEnv;
+      expect(() => loadConfig(env)).toThrow(/SUPPORT_ASSIST_ARCHIVE_/);
+      try {
+        loadConfig(env);
+      } catch (error) {
+        expect(String(error)).not.toContain('secret-password');
+      }
+    }
+  });
+});
